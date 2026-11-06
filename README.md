@@ -4,6 +4,8 @@ A phone-and-computer web app for planning the weekly shop and checking things of
 The Google Sheet stays the database: the app keeps a copy on each device, so it is instant and works
 with no signal, and syncs changes to the Sheet in the background.
 
+**Live app:** https://thanwiggins.github.io/shoppinglist/
+
 ```
 web/          the app (React + TypeScript + Vite, installable, works offline)
 apps-script/  the Sheet side: a small API, the data tables, and the one-time copy of the old tabs
