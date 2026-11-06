@@ -52,7 +52,8 @@ function api_sync_(since, ops, epoch) {
     var db = db_getMeta_();
     // The device knows a newer version than the server has (the data was re-migrated):
     // tell it to download everything again instead of applying anything.
-    if (since > db.version || (epoch && epoch !== db.epoch)) {
+    // Also covers a device that connected before the first copy (its epoch is still empty).
+    if (since > db.version || epoch !== (db.epoch || '')) {
       return { ok: true, reset: true, version: db.version, epoch: db.epoch, changes: {} };
     }
     var need = {};

@@ -71,7 +71,7 @@ export function handle(db: Db, body: { key?: string; action?: string; since?: nu
   if (body.action === 'bootstrap') return { ok: true, version: db.version, epoch: db.epoch, tables: core.coreSnapshot(db) };
   if (body.action === 'sync') {
     const since = Number(body.since) || 0;
-    if (since > db.version || (body.epoch && body.epoch !== db.epoch)) {
+    if (since > db.version || (body.epoch || '') !== (db.epoch || '')) {
       return { ok: true, reset: true, version: db.version, epoch: db.epoch, changes: {} };
     }
     core.coreApplyOps(db, body.ops || [], new Date().toISOString());

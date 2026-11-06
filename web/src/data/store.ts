@@ -217,7 +217,7 @@ export class Store {
     this.setSync('syncing');
     try {
       const res = await sync(this.transport, this.config, this.version, this.epoch, this.inflight);
-      if (res.reset) {
+      if (res.reset || (res.epoch || '') !== (this.epoch || '')) {
         // The data was re-copied on the server: pending ops point at rows that no longer exist.
         this.inflight = [];
         this.outbox = [];

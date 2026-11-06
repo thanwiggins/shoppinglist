@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { handle } from '../../dev/devApi';
-import { productId, sampleDb } from '../test/helpers';
+import { core, productId, sampleDb } from '../test/helpers';
 import type { Transport } from './api';
+import { ensureTrip } from './actions';
 import { upsert } from './ops';
+import { currentTrip } from './selectors';
 import { Store, type KV } from './store';
 
 function memoryKv(): KV & { data: Map<string, unknown> } {
@@ -121,6 +123,31 @@ describe('Store', () => {
     await store.syncNow();
     expect(store.getSnapshot().syncState).toBe('idle');
     expect(store.getSnapshot().hasData).toBe(true);
+  });
+
+  it('switches to the real data when the first copy happens after a device connected', async () => {
+    const s = server();
+    const empty = core.coreEmptyDb();
+    Object.assign(s.db, { ...empty, tables: Object.fromEntries((core.CORE_TABLES as string[]).map((t) => [t, {}])) });
+    const store = new Store(memoryKv(), s.transport);
+    await store.init(); await store.connect(config);
+    store.commit(ensureTrip(store.getSnapshot().view)); // the app makes a blank week on an empty sheet
+    await store.syncNow();
+    expect(s.db.version).toBe(1);
+
+    // The data copy runs on the server: every table replaced, one version later, new epoch.
+    const copied = sampleDb();
+    copied.version = 2;
+    for (const t of core.CORE_TABLES as string[]) {
+      copied.tableVersions[t] = 2;
+      for (const row of Object.values(copied.tables[t]) as { _v: number }[]) row._v = 2;
+    }
+    Object.assign(s.db, copied);
+    await store.syncNow();
+    const view = store.getSnapshot().view;
+    expect(Object.keys(view.products).length).toBeGreaterThan(0);
+    expect(Object.keys(view.trips)).toHaveLength(1); // the blank week is gone
+    expect(currentTrip(view)!.id).toBe(Object.keys(copied.tables.trips)[0]);
   });
 
   it('reports a wrong key instead of retrying forever', async () => {
