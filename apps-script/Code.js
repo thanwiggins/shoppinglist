@@ -8,6 +8,7 @@ function onOpen() {
     .addItem('Meal Planning','showMealSelectionForm')
     .addItem('Reset List', 'resetShoppingList')
     .addToUi();
+  aisleAddMenu_(ui);
 }
 
 function openProductForm() {
