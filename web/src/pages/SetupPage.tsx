@@ -28,7 +28,7 @@ export function SetupPage() {
       <div className="brand"><span className="brand-mark"><Check size={18} /></span>Aisle</div>
       <h1>Connect to your list</h1>
       <ol>
-        <li>In your Google Sheet, open <strong>Aisle app → Connect a device</strong>.</li>
+        <li>In your Google Sheet, open <strong>Aisle → Link New Device</strong>.</li>
         <li>Copy the web app address and the access key into the boxes below. You only do this once per device.</li>
       </ol>
       <form className="stack" onSubmit={(e) => { e.preventDefault(); void connect(); }}>

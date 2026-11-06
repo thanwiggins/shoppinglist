@@ -1,5 +1,5 @@
 /**
- * One-time setup for the Aisle app, run from the spreadsheet's "Aisle app" menu.
+ * The spreadsheet's "Aisle" menu (linking devices, access key) and the one-time data copy.
  */
 
 /** Where the app is hosted (GitHub Pages). */
@@ -8,11 +8,10 @@ var AISLE_APP_URL = 'https://thanwiggins.github.io/shoppinglist/';
 var AISLE_DEPLOYMENT_ID = 'AKfycbxopP0MqsvUtidLhP5Yfmus4yEeyXWBirIso1DfUuq0Np_44f8ZCG8-bymV3VE-z252ig';
 
 function aisleAddMenu_(ui) {
-  ui.createMenu('Aisle app')
-    .addItem('1. Copy data into the app tables', 'aisleMigrate')
-    .addItem('2. Connect a device (copy key and API address)', 'aisleShowConnect')
+  ui.createMenu('Aisle')
+    .addItem('Link New Device', 'aisleShowConnect')
     .addSeparator()
-    .addItem('Make a new access key', 'aisleRotateKey')
+    .addItem('Generate New Access Key', 'aisleRotateKey')
     .addToUi();
 }
 
@@ -28,7 +27,7 @@ function aisleShowConnect() {
   t.key = aisleEnsureKey_();
   t.apiUrl = aisleApiUrl_();
   t.appUrl = AISLE_APP_URL;
-  SpreadsheetApp.getUi().showModalDialog(t.evaluate().setWidth(480).setHeight(320), 'Connect a device');
+  SpreadsheetApp.getUi().showModalDialog(t.evaluate().setWidth(480).setHeight(320), 'Link New Device');
 }
 
 /** Kept so older menus that call it still work. */
@@ -38,7 +37,7 @@ function aisleShowKey() {
 
 function aisleRotateKey() {
   var ui = SpreadsheetApp.getUi();
-  var ok = ui.alert('Make a new access key?', 'Every device will need the new key to keep syncing.', ui.ButtonSet.OK_CANCEL);
+  var ok = ui.alert('Generate a new access key?', 'The old key stops working. Every device will need the new key to keep syncing.', ui.ButtonSet.OK_CANCEL);
   if (ok !== ui.Button.OK) return;
   PropertiesService.getScriptProperties().deleteProperty('AISLE_API_KEY');
   aisleShowConnect();
@@ -57,21 +56,40 @@ function aisleEnsureKey_() {
 }
 
 /**
- * Copies the original tabs (Products, Departments, Meals, List Builder,
- * Shopping List, Dinnerdata) into new db_* tabs. The original tabs are not changed.
+ * ONE-TIME: copies the original tabs (Products, Departments, Meals, List Builder,
+ * Shopping List, Dinnerdata) into the db_* tabs. The original tabs are not changed.
+ *
+ * Already done, so it is no longer on the menu. Running it again REPLACES all app
+ * data (new products, price changes, trips, purchase history) with a fresh copy of
+ * the old tabs. To undo a bad change to the db_* tabs, use File → Version history
+ * instead.
+ *
+ * If you really need it: in the Apps Script editor, add the Script Property
+ * AISLE_ALLOW_RECOPY = yes (Project Settings → Script Properties), then run
+ * aisleMigrate. The property is removed again after the copy. The result is
+ * written to the execution log.
  */
 function aisleMigrate() {
-  var ui = SpreadsheetApp.getUi();
+  var ui = aisleUi_();
+  var props = PropertiesService.getScriptProperties();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var existing = ss.getSheetByName(DB_PREFIX + 'products');
   if (existing && existing.getLastRow() > 1) {
-    var again = ui.alert(
-      'App tables already exist',
-      'Copying again replaces everything in the db_ tabs (including changes made in the app) ' +
-      'with a fresh copy of the original tabs. Continue?',
-      ui.ButtonSet.OK_CANCEL
-    );
-    if (again !== ui.Button.OK) return;
+    if (ui) {
+      var again = ui.alert(
+        'App tables already exist',
+        'Copying again replaces everything in the db_ tabs (including changes made in the app) ' +
+        'with a fresh copy of the original tabs. Continue?',
+        ui.ButtonSet.OK_CANCEL
+      );
+      if (again !== ui.Button.OK) return;
+    } else if (props.getProperty('AISLE_ALLOW_RECOPY') !== 'yes') {
+      throw new Error(
+        'The app tables already have data, and copying again would replace it (including trips and ' +
+        'purchase history recorded in the app). To do it anyway, add the Script Property ' +
+        'AISLE_ALLOW_RECOPY = yes and run this again.'
+      );
+    }
   }
 
   var tz = ss.getSpreadsheetTimeZone();
@@ -109,19 +127,28 @@ function aisleMigrate() {
     db.epoch = Utilities.getUuid();
     db_setMeta_(db);
     aisleEnsureKey_();
+    props.deleteProperty('AISLE_ALLOW_RECOPY');
     var r = result.report;
-    ui.alert(
-      'Copied into the app tables',
+    var summary =
       'Products: ' + r.counts.products + '   Meals: ' + r.counts.meals + '   Staples: ' + r.counts.staples +
       '\nPurchase history rows: ' + r.counts.purchases +
       '\nThis week\'s list: ' + r.counts.trip_items + ' items, estimated $' + r.newTotal.toFixed(2) +
       (r.legacyTotal !== null ? ' (Shopping List says $' + Number(r.legacyTotal).toFixed(2) + ')' : '') +
       (r.duplicatesMerged.length ? '\n\nMerged duplicate products: ' + r.duplicatesMerged.join(', ') : '') +
       (r.unknownNames.length ? '\n\nNames that matched no product (skipped): ' + r.unknownNames.join(', ') : '') +
-      '\n\nNext: Aisle app → 2. Connect a device, to copy the access key and API address into the app.',
-      ui.ButtonSet.OK
-    );
+      '\n\nNext: Aisle → Link New Device, to copy the access key and API address into the app.';
+    if (ui) ui.alert('Copied into the app tables', summary, ui.ButtonSet.OK);
+    else console.log(summary);
   } finally {
     lock.releaseLock();
+  }
+}
+
+/** The spreadsheet's UI, or null when running from the Apps Script editor (no dialogs there). */
+function aisleUi_() {
+  try {
+    return SpreadsheetApp.getUi();
+  } catch (e) {
+    return null;
   }
 }

@@ -10,7 +10,7 @@ function db_spreadsheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (ss) return ss;
   var id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
-  if (!id) throw coreError('not_configured', 'Spreadsheet not found. Run "Aisle app → Set up" from the spreadsheet menu.');
+  if (!id) throw coreError('not_configured', 'Spreadsheet not found. Open the spreadsheet and choose Aisle → Link New Device.');
   return SpreadsheetApp.openById(id);
 }
 

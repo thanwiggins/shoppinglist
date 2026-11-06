@@ -25,11 +25,13 @@ apps-script/  the Sheet side: a small API, the data tables, and the one-time cop
 
 ## One-time setup
 
-1. **Push the script.** From the repo root: `clasp push`. This adds the API files and an **Aisle app** menu
+1. **Push the script.** From the repo root: `clasp push`. This adds the API files and an **Aisle** menu
    to the spreadsheet. The old menus keep working.
-2. **Copy the data.** Reload the spreadsheet, then **Aisle app → 1. Copy data into the app tables**.
-   Approve the permissions prompt the first time. It creates the `db_*` tabs and shows a summary,
-   The estimated total should match the Shopping List total.
+2. **Copy the data (once).** In the Apps Script editor, run `aisleMigrate` (it is not on the menu, since running
+   it again would replace the app's data with the old tabs).
+   Approve the permissions prompt the first time. It creates the `db_*` tabs and logs a summary;
+   the estimated total should match the Shopping List total. If the `db_*` tabs already have data it refuses,
+   unless the Script Property `AISLE_ALLOW_RECOPY` is set to `yes` (it is cleared again afterwards).
 3. **Deploy the API.** In the Apps Script editor: **Deploy → New deployment → Web app**, Execute as **Me**,
    Who has access **Anyone**. Copy the web app URL (it ends in `/exec`).
    - If your Google Workspace domain doesn't allow "Anyone", the app can't reach the API from a phone.
@@ -38,7 +40,7 @@ apps-script/  the Sheet side: a small API, the data tables, and the one-time cop
    - **Cloudflare Pages** (works with a private repo): connect the GitHub repo, set the root directory to
      `web`, the build command to `npm run build`, and the output directory to `dist`.
    - **GitHub Pages** (needs a public repo on the free plan): build `web/` and publish `web/dist`.
-5. **Connect each device.** In the spreadsheet, **Aisle app → 2. Connect a device** shows the access key and
+5. **Connect each device.** In the spreadsheet, **Aisle → Link New Device** shows the access key and
    the web app address with Copy buttons. Paste both into the app. On a phone, use **Add to Home Screen**.
    (Set the `AISLE_APP_URL` / `AISLE_DEPLOYMENT_ID` constants in `apps-script/Setup.js` if you redeploy elsewhere.)
 
