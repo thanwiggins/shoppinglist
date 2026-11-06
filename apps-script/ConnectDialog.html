@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_blank">
+    <style>
+      body { margin: 0; font-family: 'Google Sans', Roboto, Arial, sans-serif; font-size: 14px; color: #16181d; }
+      .wrap { display: flex; flex-direction: column; gap: 16px; padding: 4px 2px; }
+      p { margin: 0; color: #5e6470; line-height: 1.45; }
+      .field { display: flex; flex-direction: column; gap: 6px; }
+      label { font-weight: 600; font-size: 13px; }
+      .row { display: flex; gap: 8px; }
+      input { flex: 1; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid #d6dad2; border-radius: 8px;
+              font-family: 'Roboto Mono', Consolas, monospace; font-size: 12px; color: #16181d; background: #f7f7f5; }
+      button { height: 38px; min-width: 84px; padding: 0 14px; border: 0; border-radius: 8px; background: #1e7f4f; color: #fff;
+               font-weight: 600; font-size: 14px; cursor: pointer; }
+      button:hover { background: #176a41; }
+      button.done { background: #e3f1e9; color: #13603a; }
+      a { color: #13603a; font-weight: 600; }
+      .warn { font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <p>Open the app on your phone or computer, then paste these two in. You only do this once per device.</p>
+
+      <div class="field">
+        <label for="key">Access key</label>
+        <div class="row">
+          <input id="key" value="<?= key ?>" readonly>
+          <button type="button" data-copy="key">Copy</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="api">Web app address (API)</label>
+        <div class="row">
+          <input id="api" value="<?= apiUrl ?>" readonly>
+          <button type="button" data-copy="api">Copy</button>
+        </div>
+      </div>
+
+      <p>The app: <a href="<?= appUrl ?>"><?= appUrl ?></a></p>
+      <p class="warn">Keep the key private. Anyone with it and the address can read and change your lists.</p>
+    </div>
+
+    <script>
+      function copy(input, button) {
+        var done = function () {
+          button.textContent = 'Copied';
+          button.classList.add('done');
+          setTimeout(function () { button.textContent = 'Copy'; button.classList.remove('done'); }, 1800);
+        };
+        // The dialog runs in a sandboxed frame where the Clipboard API may be blocked,
+        // so fall back to selecting the text and using the older copy command.
+        var fallback = function () {
+          input.focus();
+          input.select();
+          input.setSelectionRange(0, input.value.length);
+          try {
+            if (document.execCommand('copy')) return done();
+          } catch (e) {}
+          button.textContent = 'Press Ctrl+C';
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(input.value).then(done, fallback);
+        } else {
+          fallback();
+        }
+      }
+      document.querySelectorAll('[data-copy]').forEach(function (b) {
+        b.addEventListener('click', function () { copy(document.getElementById(b.getAttribute('data-copy')), b); });
+      });
+      document.querySelectorAll('input[readonly]').forEach(function (i) {
+        i.addEventListener('focus', function () { i.select(); });
+      });
+    </script>
+  </body>
+</html>

@@ -29,7 +29,7 @@ apps-script/  the Sheet side: a small API, the data tables, and the one-time cop
    to the spreadsheet. The old menus keep working.
 2. **Copy the data.** Reload the spreadsheet, then **Aisle app → 1. Copy data into the app tables**.
    Approve the permissions prompt the first time. It creates the `db_*` tabs and shows a summary,
-   including the access key. The estimated total should match the Shopping List total.
+   The estimated total should match the Shopping List total.
 3. **Deploy the API.** In the Apps Script editor: **Deploy → New deployment → Web app**, Execute as **Me**,
    Who has access **Anyone**. Copy the web app URL (it ends in `/exec`).
    - If your Google Workspace domain doesn't allow "Anyone", the app can't reach the API from a phone.
@@ -38,8 +38,9 @@ apps-script/  the Sheet side: a small API, the data tables, and the one-time cop
    - **Cloudflare Pages** (works with a private repo): connect the GitHub repo, set the root directory to
      `web`, the build command to `npm run build`, and the output directory to `dist`.
    - **GitHub Pages** (needs a public repo on the free plan): build `web/` and publish `web/dist`.
-5. **Connect each device.** Open the app, paste the web app URL and the access key
-   (**Aisle app → 2. Show access key**). On a phone, use **Add to Home Screen** to install it.
+5. **Connect each device.** In the spreadsheet, **Aisle app → 2. Connect a device** shows the access key and
+   the web app address with Copy buttons. Paste both into the app. On a phone, use **Add to Home Screen**.
+   (Set the `AISLE_APP_URL` / `AISLE_DEPLOYMENT_ID` constants in `apps-script/Setup.js` if you redeploy elsewhere.)
 
 After the first deployment, changes to the API need **Deploy → Manage deployments → Edit → New version**
 (or `clasp deploy -i <deploymentId>`) to go live. The URL stays the same.

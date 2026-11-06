@@ -2,23 +2,38 @@
  * One-time setup for the Aisle app, run from the spreadsheet's "Aisle app" menu.
  */
 
+/** Where the app is hosted (GitHub Pages). */
+var AISLE_APP_URL = 'https://thanwiggins.github.io/shoppinglist/';
+/** The "Aisle API" web-app deployment. Redeploying with `clasp update-deployment` keeps this ID. */
+var AISLE_DEPLOYMENT_ID = 'AKfycbxopP0MqsvUtidLhP5Yfmus4yEeyXWBirIso1DfUuq0Np_44f8ZCG8-bymV3VE-z252ig';
+
 function aisleAddMenu_(ui) {
   ui.createMenu('Aisle app')
     .addItem('1. Copy data into the app tables', 'aisleMigrate')
-    .addItem('2. Show access key', 'aisleShowKey')
+    .addItem('2. Connect a device (copy key and API address)', 'aisleShowConnect')
     .addSeparator()
     .addItem('Make a new access key', 'aisleRotateKey')
     .addToUi();
 }
 
+/** The API address devices connect to. A Script Property AISLE_API_URL overrides it. */
+function aisleApiUrl_() {
+  var override = PropertiesService.getScriptProperties().getProperty('AISLE_API_URL');
+  return override || 'https://script.google.com/macros/s/' + AISLE_DEPLOYMENT_ID + '/exec';
+}
+
+/** A small window with copy buttons for the access key and the API address. */
+function aisleShowConnect() {
+  var t = HtmlService.createTemplateFromFile('ConnectDialog');
+  t.key = aisleEnsureKey_();
+  t.apiUrl = aisleApiUrl_();
+  t.appUrl = AISLE_APP_URL;
+  SpreadsheetApp.getUi().showModalDialog(t.evaluate().setWidth(480).setHeight(320), 'Connect a device');
+}
+
+/** Kept so older menus that call it still work. */
 function aisleShowKey() {
-  var key = aisleEnsureKey_();
-  SpreadsheetApp.getUi().alert(
-    'Aisle access key',
-    'Enter this key in the app the first time you open it on each device:\n\n' + key +
-    '\n\nKeep it private: anyone with the key and the app address can read and change your lists.',
-    SpreadsheetApp.getUi().ButtonSet.OK
-  );
+  aisleShowConnect();
 }
 
 function aisleRotateKey() {
@@ -26,7 +41,7 @@ function aisleRotateKey() {
   var ok = ui.alert('Make a new access key?', 'Every device will need the new key to keep syncing.', ui.ButtonSet.OK_CANCEL);
   if (ok !== ui.Button.OK) return;
   PropertiesService.getScriptProperties().deleteProperty('AISLE_API_KEY');
-  aisleShowKey();
+  aisleShowConnect();
 }
 
 function aisleEnsureKey_() {
@@ -93,7 +108,7 @@ function aisleMigrate() {
     db.version = version;
     db.epoch = Utilities.getUuid();
     db_setMeta_(db);
-    var key = aisleEnsureKey_();
+    aisleEnsureKey_();
     var r = result.report;
     ui.alert(
       'Copied into the app tables',
@@ -103,7 +118,7 @@ function aisleMigrate() {
       (r.legacyTotal !== null ? ' (Shopping List says $' + Number(r.legacyTotal).toFixed(2) + ')' : '') +
       (r.duplicatesMerged.length ? '\n\nMerged duplicate products: ' + r.duplicatesMerged.join(', ') : '') +
       (r.unknownNames.length ? '\n\nNames that matched no product (skipped): ' + r.unknownNames.join(', ') : '') +
-      '\n\nAccess key for the app:\n' + key,
+      '\n\nNext: Aisle app → 2. Connect a device, to copy the access key and API address into the app.',
       ui.ButtonSet.OK
     );
   } finally {
