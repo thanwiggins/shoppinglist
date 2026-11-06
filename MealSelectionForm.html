@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100 p-6">
+    <div class="w-[600px] mx-auto bg-white shadow-lg rounded-xl p-8">
+      <form id="mealForm" class="space-y-4">
+        <!-- Create 10 dropdowns dynamically -->
+        <div class="grid grid-cols-2 gap-4">
+          <!-- Meal dropdowns with price display -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Meal 1:</label>
+            <select id="meal1" name="meals" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" onchange="updatePrice(1)">
+              <option value="" disabled selected>Select Meal</option>
+            </select>
+            <p id="price1" class="text-sm text-gray-500 mt-1"></p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Meal 2:</label>
+            <select id="meal2" name="meals" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" onchange="updatePrice(2)">
+              <option value="" disabled selected>Select Meal</option>
+            </select>
+            <p id="price2" class="text-sm text-gray-500 mt-1"></p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Meal 3:</label>
+            <select id="meal3" name="meals" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" onchange="updatePrice(3)">
+              <option value="" disabled selected>Select Meal</option>
+            </select>
+            <p id="price3" class="text-sm text-gray-500 mt-1"></p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Meal 4:</label>
+            <select id="meal4" name="meals" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" onchange="updatePrice(4)">
+              <option value="" disabled selected>Select Meal</option>
+            </select>
+            <p id="price4" class="text-sm text-gray-500 mt-1"></p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Meal 5:</label>
+            <select id="meal5" name="meals" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" onchange="updatePrice(5)">
+              <option value="" disabled selected>Select Meal</option>
+            </select>
+            <p id="price5" class="text-sm text-gray-500 mt-1"></p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Meal 6:</label>
+            <select id="meal6" name="meals" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" onchange="updatePrice(6)">
+              <option value="" disabled selected>Select Meal</option>
+            </select>
+            <p id="price6" class="text-sm text-gray-500 mt-1"></p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Meal 7:</label>
+            <select id="meal7" name="meals" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" onchange="updatePrice(7)">
+              <option value="" disabled selected>Select Meal</option>
+            </select>
+            <p id="price7" class="text-sm text-gray-500 mt-1"></p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Meal 8:</label>
+            <select id="meal8" name="meals" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" onchange="updatePrice(8)">
+              <option value="" disabled selected>Select Meal</option>
+            </select>
+            <p id="price8" class="text-sm text-gray-500 mt-1"></p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Meal 9:</label>
+            <select id="meal9" name="meals" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" onchange="updatePrice(9)">
+              <option value="" disabled selected>Select Meal</option>
+            </select>
+            <p id="price9" class="text-sm text-gray-500 mt-1"></p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Meal 10:</label>
+            <select id="meal10" name="meals" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" onchange="updatePrice(10)">
+              <option value="" disabled selected>Select Meal</option>
+            </select>
+            <p id="price10" class="text-sm text-gray-500 mt-1"></p>
+          </div>
+        </div>
+        <!-- Total Price -->
+        <div class="mt-4">
+          <p id="totalPrice" class="text-lg font-semibold text-gray-700">Total Price: $0.00</p>
+        </div>
+        <div class="flex justify-center mt-6">
+          <button type="submit" class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition duration-300">
+            Submit
+          </button>
+        </div>
+      </form>
+    </div>
+
+
+<script>
+  var mealData = []; // Holds meal names and prices
+
+  function populateMeals() {
+    google.script.run
+      .withSuccessHandler(function(mealOptions) {
+        console.log('Got meals:', mealOptions);
+        mealData = mealOptions; // store meal data
+
+        for (var i = 1; i <= 10; i++) {
+          var select = document.getElementById('meal' + i);
+          // clear any existing options (in case of re-populate)
+          select.innerHTML = '<option value="" disabled selected>Select Meal</option>';
+
+          mealData.forEach(function(meal) {
+            var option = document.createElement('option');
+            option.value = meal.name;
+            option.text = meal.name;
+            select.appendChild(option);
+          });
+        }
+      })
+      .getMealOptionsWithPrices();
+  }
+
+  function updatePrice(mealNumber) {
+    // update the individual price
+    var sel = document.getElementById('meal' + mealNumber);
+    var priceEl = document.getElementById('price' + mealNumber);
+    var selectedName = sel.value;
+    var meal = mealData.find(m => m.name === selectedName);
+
+    if (meal) {
+      priceEl.textContent = `Estimated Price: $${parseFloat(meal.price).toFixed(2)}`;
+    } else {
+      priceEl.textContent = '';
+    }
+
+    // recalc total
+    var total = 0;
+    for (var i = 1; i <= 10; i++) {
+      var mName = document.getElementById('meal' + i).value;
+      var m = mealData.find(x => x.name === mName);
+      if (m) total += parseFloat(m.price) || 0;
+    }
+    document.getElementById('totalPrice').textContent =
+      `Total Price: $${total.toFixed(2)}`;
+  }
+
+  // kick it off
+  populateMeals();
+
+  document.getElementById('mealForm').onsubmit = function(e) {
+    e.preventDefault();
+    var chosen = [];
+    for (var i = 1; i <= 10; i++) {
+      chosen.push(document.getElementById('meal' + i).value || '');
+    }
+    console.log('Submitting:', chosen);
+          google.script.run
+        .withSuccessHandler(function() {
+          google.script.host.close();
+        })
+        .withFailureHandler(function(err) {
+          alert("Meal List generation failed: " + (err && err.message ? err.message : err));
+        })
+        .processMealSelection({ meals: chosen });
+  };
+</script>
+  </body>
+</html>

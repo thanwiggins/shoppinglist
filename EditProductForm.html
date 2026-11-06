@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Product</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+
+  <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+
+    <label for="productSelect" class="block text-sm font-medium text-gray-700">Select Product:</label>
+    <select id="productSelect" class="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <option value="" disabled selected>Select Product</option>
+    </select>
+    <label for="price" class="block text-sm font-medium text-gray-700 mt-4">Price:</label>
+    <input type="text" id="price" class="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+    <label for="department" class="block text-sm font-medium text-gray-700 mt-4">Department:</label>
+    <select id="department" class="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <option value="" disabled selected>Select Department</option>
+      <option value="Nutrition">Nutrition</option>
+      <option value="Cosmetics">Cosmetics</option>
+      <option value="Auto">Auto</option>
+      <option value="Home">Home</option>
+      <option value="Baby">Baby</option>
+      <option value="Chips/Soda">Chips/Soda</option>
+      <option value="Ingredients">Ingredients</option>
+      <option value="Dairy">Dairy</option>
+      <option value="Cleaning">Cleaning</option>
+      <option value="Supplies">Supplies</option>
+      <option value="Beverages">Beverages</option>
+      <option value="Snacks">Snacks</option>
+      <option value="Cereal">Cereal</option>
+      <option value="Baking">Baking</option>
+      <option value="Pasta/Soup">Pasta/Soup</option>
+      <option value="Rice/Cans">Rice/Cans</option>
+      <option value="Condiments">Condiments</option>
+      <option value="Bread/Veggies">Bread/Veggies</option>
+      <option value="Meat Products">Meat Products</option>
+      <option value="Frozen Meals">Frozen Meals</option>
+      <option value="Frozen Novelties">Frozen Novelties</option>
+      <option value="Produce">Produce</option>
+      <option value="Fresh Goods">Fresh Goods</option>
+    </select>
+    <button onclick="updateProduct()" class="w-full mt-6 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition">Update</button>
+  </div>
+
+  <script>
+    function loadProducts() {
+      google.script.run.withSuccessHandler(function(products) {
+        var select = document.getElementById("productSelect");
+        select.innerHTML = '<option value="" disabled selected>Select Product</option>';
+        products.forEach(function(product) {
+          var option = document.createElement("option");
+          option.value = product;
+          option.textContent = product;
+          select.appendChild(option);
+        });
+      }).getProductList();
+    }
+
+    function loadProductDetails() {
+      var product = document.getElementById("productSelect").value;
+      google.script.run.withSuccessHandler(function(details) {
+        document.getElementById("price").value = details.price || "";
+        document.getElementById("department").value = details.department || "";
+      }).getProductDetails(product);
+    }
+
+    function updateProduct() {
+      var product = document.getElementById("productSelect").value;
+      var price = document.getElementById("price").value;
+      var department = document.getElementById("department").value;
+
+      google.script.run.withSuccessHandler(function(msg) {
+        alert(msg);
+      }).updateProduct(product, price, department);
+    }
+
+    window.onload = function() {
+      loadProducts();
+      document.getElementById("productSelect").addEventListener("change", loadProductDetails);
+    };
+  </script>
+
+</body>
+</html>

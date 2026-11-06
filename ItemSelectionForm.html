@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+  </head>
+  <body>
+    <h4>These items are also listed as required for these meals, but usually do not need to be purchased. Would you like to add any of these items to your list?</h4>
+    <form id="itemForm">
+      <!-- Checkboxes will be dynamically generated in the Apps Script -->
+      <input type="submit" value="Submit">
+    </form>
+
+    <script>
+      document.getElementById('itemForm').onsubmit = function(event) {
+        event.preventDefault();
+        var checkedItems = [];
+        var checkboxes = document.querySelectorAll('input[name="item"]:checked');
+        checkboxes.forEach(function(checkbox) {
+          checkedItems.push(checkbox.value);
+        });
+
+        google.script.run.withSuccessHandler(successCallback)
+                             .withFailureHandler(errorCallback)
+                             .processItemSelection({items: checkedItems});
+      };
+      function successCallback() {
+        google.script.host.close();
+        }
+
+      function errorCallback(error) {
+        console.error("Error:", error.message);
+        alert("Something went wrong and items were not added to your list.");
+        }
+    </script>
+  </body>
+</html>
