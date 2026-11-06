@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { addToTrip, finishTrip, setShopStatus, startShopping, updateProduct } from '../data/actions';
+import { addToTrip, finishTrip, setShopStatus, startShopping, updateProduct, type Leftovers } from '../data/actions';
 import { currentTrip, money, plural, shopModel, sortedDepartments, sortedSections, todayIso, type ShopRow } from '../data/selectors';
 import type { Trip } from '../data/types';
 import { store, useStore } from '../data/useStore';
-import { DeptSelect, ProductPicker, Sheet } from '../ui/common';
+import { DeptSelect, ProductPicker, Sheet, ShelfPriceField, shelfToSaved } from '../ui/common';
 import { Check } from '../ui/icons';
 import { notify } from '../ui/toast';
 
@@ -126,18 +126,15 @@ export function ShopPage() {
 function EditSheet({ row, trip, onClose }: { row: ShopRow; trip: Trip; onClose: () => void }) {
   const { view } = useStore();
   const product = view.products[row.productId];
-  const [price, setPrice] = useState(product.price.toFixed(2));
+  const [shelf, setShelf] = useState('');
   const [dept, setDept] = useState(product.dept_id);
   const [error, setError] = useState('');
-  const bump = (d: number) => {
-    const n = parseFloat(price);
-    setPrice(Math.max(0, (isFinite(n) ? n : product.price) + d).toFixed(2));
-  };
   const save = () => {
-    const n = parseFloat(price.replace('$', ''));
+    const price = shelfToSaved(shelf, view);
+    if (price !== undefined && !isFinite(price)) return setError('Enter the shelf price like 3.29, or leave it blank.');
     try {
       const fields: { price?: number; dept_id?: string } = {};
-      if (n !== product.price) fields.price = n;
+      if (price !== undefined && price !== product.price) fields.price = price;
       if (dept !== product.dept_id) fields.dept_id = dept;
       if (Object.keys(fields).length) store.commit(updateProduct(view, product.id, fields));
       onClose();
@@ -147,16 +144,9 @@ function EditSheet({ row, trip, onClose }: { row: ShopRow; trip: Trip; onClose: 
   };
   const skipped = row.status === 'skipped';
   return (
-    <Sheet title={product.name} sub="Changes save to your products for every future list." onClose={onClose}>
+    <Sheet title={product.name} sub={`Saved price ${money(product.price)}${row.qty > 1 ? ` each · you need ${row.qty}` : ''}. Changes apply to every future list.`} onClose={onClose}>
       <form className="stack" onSubmit={(e) => { e.preventDefault(); save(); }}>
-        <div className="field">
-          <label htmlFor="shelf-price">Shelf price{row.qty > 1 ? ` (each, you need ${row.qty})` : ''}</label>
-          <div className="price-row">
-            <button type="button" className="step" aria-label="Lower price by 25 cents" onClick={() => bump(-0.25)}>−</button>
-            <input id="shelf-price" className="input big num" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} onFocus={(e) => e.target.select()} />
-            <button type="button" className="step" aria-label="Raise price by 25 cents" onClick={() => bump(0.25)}>+</button>
-          </div>
-        </div>
+        <ShelfPriceField id="shelf-price" value={shelf} onChange={setShelf} current={product.price} big />
         <div className="field">
           <label htmlFor="shelf-dept">Department (store order)</label>
           <DeptSelect id="shelf-dept" value={dept} onChange={setDept} view={view} />
@@ -180,44 +170,70 @@ function EditSheet({ row, trip, onClose }: { row: ShopRow; trip: Trip; onClose: 
   );
 }
 
-function FinishSheet({ trip, onClose }: { trip: Trip; onClose: () => void }) {
+/** "Finish trip" on Shop and "Reset List" on Plan: the same step under two names. */
+export function FinishSheet({ trip, onClose, title = 'Finish trip', after = '#/plan' }: {
+  trip: Trip; onClose: () => void; title?: string; after?: string;
+}) {
   const { view } = useStore();
   const model = shopModel(view, trip);
   const [date, setDate] = useState(todayIso());
-  const leftover = model.groups.flatMap((g) => g.rows).filter((r) => r.status !== 'in_cart');
-  const [carry, setCarry] = useState(true);
+  const rowsAll = model.groups.flatMap((g) => g.rows);
+  const unchecked = rowsAll.filter((r) => r.status === 'todo');
+  const outOfStock = rowsAll.filter((r) => r.status === 'skipped');
+  // Nothing checked off usually means the store trip wasn't tracked in the app: assume it was all bought.
+  const [leftovers, setLeftovers] = useState<Leftovers>(model.done === 0 ? 'bought' : 'carry');
+  const boughtCount = model.done + (leftovers === 'bought' ? unchecked.length : 0);
+  const them = unchecked.length === 1 ? 'it' : 'them';
   const finish = () => {
-    store.commit(finishTrip(view, trip, date, carry));
+    store.commit(finishTrip(view, trip, date, leftovers));
     onClose();
-    notify(`Trip saved: ${plural(model.done, 'item')}, ${money(model.cart)}`);
-    location.hash = '#/plan';
+    notify(`List reset: ${plural(boughtCount, 'item')} saved to your history`);
+    location.hash = after;
   };
+  const option = (value: Leftovers, label: string) => (
+    <label className="radio-row">
+      <input type="radio" name="leftovers" value={value} checked={leftovers === value} onChange={() => setLeftovers(value)} />
+      <span>{label}</span>
+    </label>
+  );
   return (
-    <Sheet title="Finish trip" sub="Saves what you bought to your history and starts next week's list." onClose={onClose}>
+    <Sheet title={title} sub="Saves what you bought to your history and starts next week's list. Staples stay; this week's extras clear." onClose={onClose}>
       <form className="stack" onSubmit={(e) => { e.preventDefault(); finish(); }}>
         <div className="card" style={{ padding: 14 }}>
           <div className="row-flex" style={{ justifyContent: 'space-between' }}>
-            <span>In the cart</span><strong className="num">{plural(model.done, 'item')} · {money(model.cart)}</strong>
+            <span>Checked off</span><strong className="num">{plural(model.done, 'item')} · {money(model.cart)}</strong>
           </div>
-          {leftover.length > 0 && (
+          {unchecked.length > 0 && (
             <div className="row-flex muted" style={{ justifyContent: 'space-between', marginTop: 6 }}>
-              <span>Not bought</span><span className="num">{plural(leftover.length, 'item')}</span>
+              <span>Not checked off</span><span className="num">{plural(unchecked.length, 'item')}</span>
+            </div>
+          )}
+          {outOfStock.length > 0 && (
+            <div className="row-flex muted" style={{ justifyContent: 'space-between', marginTop: 6 }}>
+              <span>Out of stock</span><span className="num">{plural(outOfStock.length, 'item')}</span>
             </div>
           )}
         </div>
+        {unchecked.length > 0 && (
+          <fieldset className="radio-group">
+            <legend className="label">The {plural(unchecked.length, 'item')} not checked off</legend>
+            {option('carry', `Put ${them} on next week's list`)}
+            {option('bought', `Count ${them} as bought`)}
+            {option('drop', `Leave ${them} off next week`)}
+          </fieldset>
+        )}
+        {outOfStock.length > 0 && (
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            {leftovers === 'drop' ? 'Out-of-stock items will be left off too.' : 'Out-of-stock items go on next week\'s list.'}
+          </p>
+        )}
         <div className="field">
           <label htmlFor="trip-date">Trip date</label>
           <input id="trip-date" type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} required />
         </div>
-        {leftover.length > 0 && (
-          <label className="row-flex" style={{ gap: 10, cursor: 'pointer' }}>
-            <input type="checkbox" checked={carry} onChange={(e) => setCarry(e.target.checked)} style={{ width: 20, height: 20 }} />
-            <span>Put the {leftover.length === 1 ? 'item' : `${leftover.length} items`} I didn't get on next week's list</span>
-          </label>
-        )}
         <div className="sheet-actions">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn primary">Finish trip</button>
+          <button type="submit" className="btn primary">{title}</button>
         </div>
       </form>
     </Sheet>

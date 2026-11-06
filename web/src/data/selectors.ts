@@ -135,7 +135,7 @@ export function planModel(t: Tables, trip: Trip | undefined): PlanModel {
     });
     const others = mine
       .filter((i) => !stapleIds.has(i.product_id))
-      .sort((a, b) => byName(t.products[a.product_id], t.products[b.product_id]));
+      .sort((a, b) => (a.sort || 0) - (b.sort || 0) || byName(t.products[a.product_id], t.products[b.product_id]));
     const toPlan = (i: TripItem): PlanItem => ({ productId: i.product_id, product: t.products[i.product_id], sectionId: section.id, qty: i.qty, item: i });
     const groups: PlanSection['groups'] = [
       { kind: 'staple' as const, items: stapleItems },

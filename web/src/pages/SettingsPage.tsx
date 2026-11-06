@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { setSetting } from '../data/actions';
-import { setting } from '../data/selectors';
+import { savedPrice } from '../data/pricing';
+import { money, setting } from '../data/selectors';
 import { store, useStore } from '../data/useStore';
 import { notify } from '../ui/toast';
 
@@ -40,10 +41,10 @@ export function SettingsPage() {
       </section>
 
       <section className="card card-pad stack">
-        <h2 style={{ margin: 0, fontSize: 17 }}>Totals</h2>
+        <h2 style={{ margin: 0, fontSize: 17 }}>Prices and budget</h2>
         <div className="row-flex" style={{ flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
           <div className="field" style={{ width: 160 }}>
-            <label htmlFor="tax">Sales tax estimate (%)</label>
+            <label htmlFor="tax">Sales tax (%)</label>
             <input id="tax" className="input num" inputMode="decimal" value={tax} onChange={(e) => setTax(e.target.value)} onBlur={() => saveNumber('tax_rate', tax)} />
           </div>
           <div className="field" style={{ width: 200 }}>
@@ -51,7 +52,12 @@ export function SettingsPage() {
             <input id="budget" className="input num" inputMode="decimal" value={budget} placeholder="No budget" onChange={(e) => setBudget(e.target.value)} onBlur={() => saveNumber('budget', budget)} />
           </div>
         </div>
-        <p className="muted" style={{ margin: 0, fontSize: 13 }}>Prices are stored before tax. When set, the plan shows the total with tax and how it compares with the budget.</p>
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+          You type shelf prices; Aisle saves them with tax added, rounded up to the next 50¢
+          (or down, if it's within 10¢ of the step below). Example: a $3.29 shelf price saves
+          as <strong className="num">{money(savedPrice(3.29, parseFloat(tax) || 0))}</strong>
+          {parseFloat(tax) ? ` at ${parseFloat(tax)}%` : ''}. Prices you've already saved don't change.
+        </p>
       </section>
 
       <section className="card card-pad stack">

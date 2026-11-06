@@ -54,7 +54,8 @@ var CORE_SCHEMA = {
     qty: { type: 'number', def: 0 },
     source: { type: 'string', def: 'added' },
     status: { type: 'string', def: 'todo' },
-    price: { type: 'number', def: 0 }
+    price: { type: 'number', def: 0 },
+    sort: { type: 'number', def: 0 }
   },
   trip_meals: {
     trip_id: { type: 'string', def: '' },

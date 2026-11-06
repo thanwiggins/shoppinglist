@@ -23,6 +23,11 @@ function findItem(t: Tables, tripId: string, sectionId: string, productId: strin
   return rows(t.trip_items).find((i) => i.trip_id === tripId && i.section_id === sectionId && i.product_id === productId);
 }
 
+/** The next position at the end of a section's list for this trip. */
+function nextSort(t: Tables, tripId: string, sectionId: string): number {
+  return Math.max(0, ...rows(t.trip_items).filter((i) => i.trip_id === tripId && i.section_id === sectionId).map((i) => i.sort || 0)) + 1;
+}
+
 function isStaple(t: Tables, sectionId: string, productId: string) {
   return rows(t.staples).some((s) => s.section_id === sectionId && s.product_id === productId);
 }
@@ -34,7 +39,8 @@ export function setQty(t: Tables, trip: Trip, sectionId: string, productId: stri
   if (qty === 0) return [];
   return [upsert('trip_items', newId('ti'), {
     trip_id: trip.id, product_id: productId, section_id: sectionId, qty,
-    source: isStaple(t, sectionId, productId) ? 'staple' : 'added', status: 'todo'
+    source: isStaple(t, sectionId, productId) ? 'staple' : 'added', status: 'todo',
+    sort: nextSort(t, trip.id, sectionId)
   })];
 }
 
@@ -57,16 +63,19 @@ export function toggleStaple(t: Tables, sectionId: string, productId: string): O
   return [upsert('staples', newId('st'), { section_id: sectionId, product_id: productId, default_qty: 1, sort })];
 }
 
-/** Moves a staple up (-1) or down (+1) within its section. */
-export function moveStaple(t: Tables, stapleId: string, delta: -1 | 1): Op[] {
-  const staple = t.staples[stapleId];
-  if (!staple) return [];
-  const list = rows(t.staples).filter((s) => s.section_id === staple.section_id).sort((a, b) => a.sort - b.sort);
-  const i = list.findIndex((s) => s.id === stapleId);
-  const j = i + delta;
-  if (j < 0 || j >= list.length) return [];
-  [list[i], list[j]] = [list[j], list[i]];
-  return list.flatMap((s, k) => (s.sort === k + 1 ? [] : [upsert('staples', s.id, { sort: k + 1 })]));
+/** Saves a new order for a section's staples (product ids, top to bottom). */
+export function reorderStaples(t: Tables, sectionId: string, productIds: string[]): Op[] {
+  const bySection = rows(t.staples).filter((s) => s.section_id === sectionId);
+  const ops: Op[] = [];
+  productIds.forEach((pid, k) => {
+    for (const s of bySection) if (s.product_id === pid && s.sort !== k + 1) ops.push(upsert('staples', s.id, { sort: k + 1 }));
+  });
+  return ops;
+}
+
+/** Saves a new order for this week's (non-staple) items in one group (trip item ids, top to bottom). */
+export function reorderTripItems(t: Tables, itemIds: string[]): Op[] {
+  return itemIds.flatMap((id, k) => (t.trip_items[id] && t.trip_items[id].sort !== k + 1 ? [upsert('trip_items', id, { sort: k + 1 })] : []));
 }
 
 /** Check off (or un-check, or skip) a product on the shopping list, across every section it's in. */
@@ -81,20 +90,28 @@ export function startShopping(trip: Trip): Op[] {
 }
 
 /**
- * Finishes a trip: records purchases for what was checked off, closes the trip,
- * and opens next week's trip. Unchecked and out-of-stock items can carry over.
- * Each product gets ONE purchase row even if it was in two sections.
+ * What to do with items that weren't checked off when a trip is finished:
+ *   carry   put them (and out-of-stock items) on next week's list
+ *   bought  count unchecked items as bought; out-of-stock items still carry over
+ *   drop    leave them off next week's list
  */
-export function finishTrip(t: Tables, trip: Trip, date: string, carryOver: boolean): Op[] {
+export type Leftovers = 'carry' | 'bought' | 'drop';
+
+/**
+ * Finishes a trip (also "Reset List"): records purchases, closes the trip and opens
+ * next week's. Each product gets ONE purchase row even if it was in two sections.
+ */
+export function finishTrip(t: Tables, trip: Trip, date: string, leftovers: Leftovers): Op[] {
   const ops: Op[] = [];
   const items = tripItems(t, trip.id).filter((i) => i.qty > 0 && t.products[i.product_id]);
   const bought = new Map<string, number>();
+  const isBought = (i: TripItem) => i.status === 'in_cart' || (leftovers === 'bought' && i.status === 'todo');
   let est = 0, actual = 0;
   for (const i of items) {
     const price = t.products[i.product_id].price;
     est += price * i.qty;
-    ops.push(upsert('trip_items', i.id, { price }));
-    if (i.status === 'in_cart') {
+    ops.push(upsert('trip_items', i.id, { price, ...(isBought(i) && i.status !== 'in_cart' ? { status: 'in_cart' as const } : {}) }));
+    if (isBought(i)) {
       actual += price * i.qty;
       bought.set(i.product_id, (bought.get(i.product_id) ?? 0) + i.qty);
     }
@@ -107,12 +124,12 @@ export function finishTrip(t: Tables, trip: Trip, date: string, carryOver: boole
 
   const nextId = newId('t');
   ops.push(upsert('trips', nextId, { status: 'planning', created: todayIso() }));
-  if (carryOver) {
+  if (leftovers !== 'drop') {
     for (const i of items) {
-      if (i.status === 'in_cart') continue;
+      if (isBought(i)) continue;
       ops.push(upsert('trip_items', newId('ti'), {
         trip_id: nextId, product_id: i.product_id, section_id: i.section_id, qty: i.qty,
-        source: isStaple(t, i.section_id, i.product_id) ? 'staple' : 'carried', status: 'todo'
+        source: isStaple(t, i.section_id, i.product_id) ? 'staple' : 'carried', status: 'todo', sort: i.sort || 0
       }));
     }
   }
@@ -132,7 +149,8 @@ function adjustMealIngredient(t: Tables, trip: Trip, sectionId: string, productI
   }
   if (delta <= 0) return [];
   const id = newId('ti');
-  const fields = { trip_id: trip.id, product_id: productId, section_id: sectionId, qty: delta, source: 'meal' as const, status: 'todo' as const, price: 0 };
+  const sort = Math.max(nextSort(t, trip.id, sectionId), ...[...pending.values()].map((p) => (p.sort || 0) + 1));
+  const fields = { trip_id: trip.id, product_id: productId, section_id: sectionId, qty: delta, source: 'meal' as const, status: 'todo' as const, price: 0, sort };
   pending.set(key, { id, ...fields });
   return [upsert('trip_items', id, fields)];
 }
@@ -281,16 +299,6 @@ export function deleteDepartment(t: Tables, id: string): Op[] {
 
 export function setSetting(key: string, value: string): Op[] {
   return [upsert('settings', key, { value })];
-}
-
-/** Picks the section a product most likely belongs in: where it's a staple, else where it was last added. */
-export function bestSectionFor(t: Tables, productId: string): string | undefined {
-  const staple = rows(t.staples).find((s) => s.product_id === productId);
-  if (staple) return staple.section_id;
-  const recent = rows(t.trip_items)
-    .filter((i) => i.product_id === productId)
-    .sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''))[0];
-  return recent?.section_id;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;

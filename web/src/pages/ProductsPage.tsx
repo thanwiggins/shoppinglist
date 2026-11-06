@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActionError, createDepartment, deleteDepartment, moveDepartment, renameDepartment, updateProduct
 } from '../data/actions';
-import { plural, productStats, rows, shortDate, sortedDepartments, type ProductStats } from '../data/selectors';
+import { money, plural, productStats, rows, shortDate, sortedDepartments, type ProductStats } from '../data/selectors';
 import type { Product, Tables } from '../data/types';
 import { store, useStore } from '../data/useStore';
 import { DeptSelect, ProductSheet } from '../ui/common';
@@ -94,16 +94,14 @@ function ProductList() {
 
 function ProductRow({ p, view, s }: { p: Product; view: Tables; s?: ProductStats }) {
   const [name, setName] = useState(p.name);
-  const [price, setPrice] = useState(p.price.toFixed(2));
+  const [pricing, setPricing] = useState(false);
   useEffect(() => setName(p.name), [p.name]);
-  useEffect(() => setPrice(p.price.toFixed(2)), [p.price]);
   const save = (fields: Partial<Product>) => {
     try {
       store.commit(updateProduct(store.getSnapshot().view, p.id, fields));
     } catch (e) {
       notify(e instanceof ActionError ? e.message : String(e));
       setName(p.name);
-      setPrice(p.price.toFixed(2));
     }
   };
   const archive = () => {
@@ -124,17 +122,10 @@ function ProductRow({ p, view, s }: { p: Product; view: Tables; s?: ProductStats
         <DeptSelect className="cell-input" value={p.dept_id} view={view} label={`Department for ${p.name}`} onChange={(v) => save({ dept_id: v })} />
       </td>
       <td className="c-price" style={{ textAlign: 'right' }}>
-        <input
-          className="cell-input price" value={price} inputMode="decimal" aria-label={`Price of ${p.name}`}
-          onChange={(e) => setPrice(e.target.value)}
-          onFocus={(e) => e.target.select()}
-          onBlur={() => {
-            const n = parseFloat(price.replace('$', ''));
-            if (!isFinite(n)) setPrice(p.price.toFixed(2));
-            else if (n !== p.price) save({ price: n });
-          }}
-          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-        />
+        <button type="button" className="cell-input price" aria-label={`Price of ${p.name}: ${money(p.price)}. Change it`} onClick={() => setPricing(true)}>
+          {money(p.price)}
+        </button>
+        {pricing && <ProductSheet product={p} title={`Price of ${p.name}`} focusPrice onClose={() => setPricing(false)} />}
       </td>
       <td className="c-hist">
         {s?.last ? (

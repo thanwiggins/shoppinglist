@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { mealId, productId, sampleView, sectionId } from '../test/helpers';
 import {
-  ActionError, createProduct, deleteDepartment, finishTrip, moveDepartment, pantryCheck, setPantryNeeded,
-  setQty, setShopStatus, toggleMeal, toggleStaple, updateProduct
+  ActionError, createProduct, deleteDepartment, finishTrip, moveDepartment, pantryCheck, reorderStaples,
+  reorderTripItems, setPantryNeeded, setQty, setShopStatus, toggleMeal, toggleStaple, updateProduct
 } from './actions';
 import { applyOps } from './ops';
 import { currentTrip, planModel, productStats, rows, shopModel, sortedDepartments } from './selectors';
@@ -107,7 +107,7 @@ describe('shopping and finishing a trip', () => {
     t = applyOps(t, setShopStatus(t, trip, milk, 'in_cart'));
     t = applyOps(t, setShopStatus(t, trip, productId(t, 'Apples'), 'skipped'));
     const before = rows(t.purchases).filter((p) => p.product_id === milk).length;
-    t = applyOps(t, finishTrip(t, trip, '2026-11-07', true));
+    t = applyOps(t, finishTrip(t, trip, '2026-11-07', 'carry'));
 
     const milkBuys = rows(t.purchases).filter((p) => p.product_id === milk);
     expect(milkBuys).toHaveLength(before + 1);
@@ -147,3 +147,55 @@ describe('products and departments', () => {
     expect(() => deleteDepartment(t, produce.id)).toThrow(/Move its/);
   });
 });
+
+describe('reordering the plan', () => {
+  const names = (t: ReturnType<typeof sampleView>, section: string, kind: string) =>
+    planModel(t, currentTrip(t)).sections.find((s) => s.section.name === section)!
+      .groups.find((g) => g.kind === kind)!.items.map((i) => i.product.name);
+
+  it('reorders staples within a section', () => {
+    let t = sampleView();
+    expect(names(t, 'Supplies', 'staple')).toEqual(['Diapers', 'Wipes', 'Paper Towels']);
+    const ids = ['Paper Towels', 'Diapers', 'Wipes'].map((n) => productId(t, n));
+    t = applyOps(t, reorderStaples(t, sectionId(t, 'Supplies'), ids));
+    expect(names(t, 'Supplies', 'staple')).toEqual(['Paper Towels', 'Diapers', 'Wipes']);
+  });
+
+  it("reorders this week's items and puts new ones at the bottom", () => {
+    let t = sampleView();
+    const trip = currentTrip(t)!;
+    const sec = sectionId(t, 'Supplies');
+    t = applyOps(t, setQty(t, trip, sec, productId(t, 'Toilet Paper'), 1));
+    t = applyOps(t, setQty(t, trip, sec, productId(t, 'Apples'), 1));
+    expect(names(t, 'Supplies', 'added')).toEqual(['Deodorant', 'Dish Soap', 'Toilet Paper', 'Apples']);
+    const itemId = (n: string) => rows(t.trip_items).find((i) => i.section_id === sec && i.product_id === productId(t, n))!.id;
+    t = applyOps(t, reorderTripItems(t, ['Apples', 'Toilet Paper', 'Dish Soap', 'Deodorant'].map(itemId)));
+    expect(names(t, 'Supplies', 'added')).toEqual(['Apples', 'Toilet Paper', 'Dish Soap', 'Deodorant']);
+  });
+});
+
+describe('reset list options', () => {
+  const setup = () => {
+    let t = sampleView();
+    const trip = currentTrip(t)!;
+    t = applyOps(t, setShopStatus(t, trip, productId(t, 'Apples'), 'skipped'));
+    return { t, trip };
+  };
+  const nextItems = (t: ReturnType<typeof sampleView>) => rows(t.trip_items).filter((i) => i.trip_id === currentTrip(t)!.id);
+
+  it('counts unchecked items as bought, but out-of-stock ones still carry over', () => {
+    let { t, trip } = setup();
+    const milk = productId(t, 'Milk'); // on the list, not checked off
+    t = applyOps(t, finishTrip(t, trip, '2026-11-07', 'bought'));
+    expect(rows(t.purchases).some((p) => p.product_id === milk && p.date === '2026-11-07')).toBe(true);
+    expect(nextItems(t).map((i) => t.products[i.product_id].name)).toEqual(['Apples']);
+    expect(t.trips[trip.id].actual_total).toBe(t.trips[trip.id].est_total - 5); // Apples: 10 × $0.50 not bought
+  });
+
+  it('drops everything that was not bought', () => {
+    let { t, trip } = setup();
+    t = applyOps(t, finishTrip(t, trip, '2026-11-07', 'drop'));
+    expect(nextItems(t)).toHaveLength(0);
+  });
+});
+

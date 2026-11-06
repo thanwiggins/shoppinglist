@@ -137,6 +137,11 @@ a { color: var(--accent-ink); }
 .input-money > span { position: absolute; left: 12px; color: var(--muted); pointer-events: none; }
 .input-money > .input { padding-left: 24px; }
 .form-error { color: var(--warn); font-size: 13px; font-weight: 600; }
+.price-preview { font-size: 14px; min-height: 20px; }
+.radio-group { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.radio-group legend { margin-bottom: 6px; padding: 0; }
+.radio-row { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.radio-row input { width: 20px; height: 20px; accent-color: var(--accent); margin: 0; }
 
 /* ---------- Stepper ---------- */
 .stepper { display: inline-flex; align-items: center; border: 1px solid var(--control); border-radius: 10px; overflow: hidden; background: var(--surface); flex: none; }
@@ -202,7 +207,7 @@ a { color: var(--accent-ink); }
 .meals-strip .chip { border-color: var(--meal-line); }
 .group-head { padding: 12px 16px 4px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .group-head .hint { font-size: 12px; color: var(--faint); }
-.plan-row { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 6px; min-height: 48px; }
+.plan-row { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; min-height: 48px; }
 .plan-row:hover { background: var(--surface-2); }
 .plan-row .info { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; border: 0; background: none; padding: 4px 2px; text-align: left; cursor: pointer; border-radius: 8px; }
 .plan-row .name { font-weight: 500; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; }
@@ -210,9 +215,19 @@ a { color: var(--accent-ink); }
 .plan-row.zero .name { color: var(--faint); }
 .plan-row .price { font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .pin { color: #878d97; flex: none; }
+.grip { flex: none; width: 24px; height: 36px; margin-right: -4px; border: 0; background: transparent; color: var(--faint); cursor: grab; touch-action: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; padding: 0; }
+.grip:hover { color: var(--ink); background: var(--hover); }
+.sort-item { position: relative; background: var(--surface); }
+.sort-item.sorting { transition: transform 0.15s ease; }
+.sort-item.dragging { transition: none; z-index: 3; box-shadow: var(--shadow); border-radius: 10px; }
+.sort-item.dragging .grip { cursor: grabbing; color: var(--accent); }
+body.is-sorting, body.is-sorting * { user-select: none; -webkit-user-select: none; cursor: grabbing; }
+@media (prefers-reduced-motion: reduce) { .sort-item.sorting { transition: none; } }
 .pin.on { color: var(--accent); }
 .add-wrap { padding: 10px 12px 14px; }
-.footnote { margin: 16px 0 0; color: var(--muted); font-size: 13px; }
+.footnote { margin: 0; color: var(--muted); font-size: 13px; max-width: 70ch; }
+.footnote svg { vertical-align: -2px; }
+.plan-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; margin-top: 18px; }
 
 /* ---------- Shop ---------- */
 .shop-head { margin: -16px -12px 0; padding: 14px 16px 12px; background: var(--surface); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
@@ -284,7 +299,8 @@ a { color: var(--accent-ink); }
 .cell-input { width: 100%; height: 36px; border: 1px solid transparent; border-radius: 8px; background: transparent; padding: 0 8px; }
 .cell-input:hover { border-color: var(--control); background: var(--surface); }
 .cell-input:focus { border-color: var(--accent); background: var(--surface); outline: none; }
-.cell-input.price { width: 84px; text-align: right; font-variant-numeric: tabular-nums; }
+.cell-input.price { width: 84px; text-align: right; font-variant-numeric: tabular-nums; cursor: pointer; }
+button.cell-input.price { display: inline-flex; align-items: center; justify-content: flex-end; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
 .tabs button { height: 40px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); font-weight: 600; cursor: pointer; }
 .tabs button[aria-pressed='true'] { color: var(--ink); border-bottom-color: var(--ink); }

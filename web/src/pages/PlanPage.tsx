@@ -1,16 +1,16 @@
 import { useMemo, useState } from 'react';
+import { addToTrip, removeFromTrip, reorderStaples, reorderTripItems, setQty, toggleStaple } from '../data/actions';
 import {
-  addToTrip, bestSectionFor, moveStaple, removeFromTrip, setQty, toggleStaple
-} from '../data/actions';
-import {
-  currentTrip, lastFinishedTrip, money, planModel, productStats, rows, selectedMealIds, settingNumber,
+  currentTrip, lastFinishedTrip, money, plural, planModel, selectedMealIds, settingNumber,
   shortDate, sortedSections, type GroupKind, type PlanItem, type PlanSection
 } from '../data/selectors';
 import type { Tables, Trip } from '../data/types';
 import { store, useStore } from '../data/useStore';
 import { ProductPicker, ProductSheet, SECTION_COLORS, Sheet, Stepper } from '../ui/common';
-import { Arrow, Down, Pin, Up } from '../ui/icons';
+import { Arrow, Grip, Pin } from '../ui/icons';
+import { Sortable, type GripProps } from '../ui/Sortable';
 import { notify } from '../ui/toast';
+import { FinishSheet } from './ShopPage';
 
 const GROUP_LABEL: Record<GroupKind, [string, string]> = {
   staple: ['Staples', 'Every week'],
@@ -23,9 +23,9 @@ export function PlanPage() {
   const trip = currentTrip(view);
   const model = useMemo(() => planModel(view, trip), [view, trip]);
   const last = lastFinishedTrip(view);
-  const tax = settingNumber(view, 'tax_rate') ?? 0;
   const budget = settingNumber(view, 'budget');
   const colors = new Map(sortedSections(view).map((s, i) => [s.id, SECTION_COLORS[i % SECTION_COLORS.length]]));
+  const [resetting, setResetting] = useState(false);
 
   if (!trip) return <div className="empty">Getting this week ready…</div>;
 
@@ -36,21 +36,19 @@ export function PlanPage() {
           <div>
             <h1>Plan this week</h1>
             <p className="muted" style={{ margin: '4px 0 0' }}>
-              {model.count} {model.count === 1 ? 'item' : 'items'} on the list{last ? ` · last trip ${shortDate(last.date)}` : ''}
+              {plural(model.count, 'item')} on the list{last ? ` · last trip ${shortDate(last.date)}` : ''}
             </p>
           </div>
           <div className="total-block">
             <div className="eyebrow">Estimated total</div>
             <div className="total">{money(model.total)}</div>
-            {(tax > 0 || budget) && (
+            {budget ? (
               <div className="muted num" style={{ fontSize: 13 }}>
-                {tax > 0 && `≈ ${money(model.total * (1 + tax / 100))} with tax`}
-                {tax > 0 && budget ? ' · ' : ''}
-                {budget ? (model.total * (1 + tax / 100) > budget
-                  ? <span style={{ color: 'var(--warn)' }}>{money(model.total * (1 + tax / 100) - budget)} over budget</span>
-                  : `${money(budget - model.total * (1 + tax / 100))} under budget`) : ''}
+                {model.total > budget
+                  ? <span style={{ color: 'var(--warn)' }}>{money(model.total - budget)} over budget</span>
+                  : `${money(budget - model.total)} under budget`}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
         <div className="balance" aria-hidden>
@@ -67,7 +65,6 @@ export function PlanPage() {
             </div>
           ))}
         </div>
-        <DueForRestock trip={trip} />
       </section>
 
       <div className="sections">
@@ -76,12 +73,18 @@ export function PlanPage() {
         ))}
       </div>
 
-      <div className="row-flex" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+      <div className="plan-foot">
         <p className="footnote">
-          Pinned items are staples: they show up every week, at zero until you need them. Everything else clears after the trip.
+          Pinned items are staples: they show up every week, at zero until you need them. Everything else clears when you reset the list.
+          Drag <Grip size={14} /> to reorder.
         </p>
-        <a className="btn primary" href="#/shop" style={{ marginTop: 16 }}>Start shopping <Arrow size={16} /></a>
+        <div className="row-flex" style={{ flexWrap: 'wrap' }}>
+          <button type="button" className="btn" onClick={() => setResetting(true)}>Reset List</button>
+          <a className="btn primary" href="#/shop">Start shopping <Arrow size={16} /></a>
+        </div>
       </div>
+
+      {resetting && <FinishSheet trip={trip} title="Reset List" after="#/plan" onClose={() => setResetting(false)} />}
     </>
   );
 }
@@ -90,12 +93,23 @@ function SectionCard({ s, trip, color, view }: { s: PlanSection; trip: Trip; col
   const isMealSection = s.groups.some((g) => g.kind === 'meal') || s.section.name.toLowerCase() === 'dinner';
   const meals = isMealSection ? [...selectedMealIds(view, trip.id)].map((id) => view.meals[id]).filter(Boolean) : [];
   const onList = useMemo(() => new Set(s.groups.flatMap((g) => g.items.map((i) => i.productId))), [s]);
+
+  const reorder = (kind: GroupKind, items: PlanItem[], keys: string[]) => {
+    const current = store.getSnapshot().view;
+    if (kind === 'staple') {
+      store.commit(reorderStaples(current, s.section.id, keys));
+    } else {
+      const byProduct = new Map(items.map((i) => [i.productId, i.item!.id]));
+      store.commit(reorderTripItems(current, keys.map((k) => byProduct.get(k)!)));
+    }
+  };
+
   return (
     <section className="card section-card" aria-label={s.section.name}>
       <header className="section-head">
         <span className="swatch" style={{ background: color }} />
         <h2>{s.section.name}</h2>
-        <span className="muted" style={{ fontSize: 12 }}>{s.count} {s.count === 1 ? 'item' : 'items'}</span>
+        <span className="muted" style={{ fontSize: 12 }}>{plural(s.count, 'item')}</span>
         <span className="total">{money(s.total)}</span>
       </header>
       {isMealSection && (
@@ -117,7 +131,12 @@ function SectionCard({ s, trip, color, view }: { s: PlanSection; trip: Trip; col
             <span className="eyebrow">{GROUP_LABEL[g.kind][0]}</span>
             <span className="hint">{GROUP_LABEL[g.kind][1]}</span>
           </div>
-          {g.items.map((it) => <PlanRow key={it.productId} it={it} trip={trip} view={view} />)}
+          <Sortable
+            items={g.items}
+            getKey={(it) => it.productId}
+            onReorder={(keys) => reorder(g.kind, g.items, keys)}
+            render={(it, grip) => <PlanRow it={it} trip={trip} view={view} grip={grip} />}
+          />
         </div>
       ))}
       <div className="add-wrap">
@@ -131,7 +150,7 @@ function SectionCard({ s, trip, color, view }: { s: PlanSection; trip: Trip; col
   );
 }
 
-function PlanRow({ it, trip, view }: { it: PlanItem; trip: Trip; view: Tables }) {
+function PlanRow({ it, trip, view, grip }: { it: PlanItem; trip: Trip; view: Tables; grip: GripProps }) {
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
   const pinned = !!it.staple;
@@ -142,6 +161,9 @@ function PlanRow({ it, trip, view }: { it: PlanItem; trip: Trip; view: Tables })
   };
   return (
     <div className={`plan-row${it.qty ? '' : ' zero'}`}>
+      <button type="button" className="grip" aria-label={`Reorder ${name} (drag, or use the up and down arrow keys)`} title="Drag to reorder" {...grip}>
+        <Grip size={16} />
+      </button>
       <button
         type="button" className={`icon-btn pin${pinned ? ' on' : ''}`} onClick={togglePin}
         aria-pressed={pinned}
@@ -162,12 +184,6 @@ function PlanRow({ it, trip, view }: { it: PlanItem; trip: Trip; view: Tables })
             <button type="button" className="btn big block" onClick={() => { togglePin(); setMenu(false); }}>
               {pinned ? 'Unpin: stop showing every week' : 'Pin as a weekly staple'}
             </button>
-            {pinned && (
-              <div className="row-flex">
-                <button type="button" className="btn big" style={{ flex: 1 }} onClick={() => store.commit(moveStaple(view, it.staple!.id, -1))}><Up /> Move up</button>
-                <button type="button" className="btn big" style={{ flex: 1 }} onClick={() => store.commit(moveStaple(view, it.staple!.id, 1))}><Down /> Move down</button>
-              </div>
-            )}
             {!pinned && (
               <button type="button" className="btn big block danger" onClick={() => { store.commit(removeFromTrip(view, trip, it.sectionId, it.productId)); setMenu(false); }}>
                 Remove from this week
@@ -176,61 +192,7 @@ function PlanRow({ it, trip, view }: { it: PlanItem; trip: Trip; view: Tables })
           </div>
         </Sheet>
       )}
-      {editing && <ProductSheet product={it.product} onClose={() => setEditing(false)} />}
+      {editing && <ProductSheet product={it.product} focusPrice onClose={() => setEditing(false)} />}
     </div>
   );
 }
-
-/** Suggestions from purchase history: things you usually buy by now that aren't on the list. */
-function DueForRestock({ trip }: { trip: Trip }) {
-  const { view } = useStore();
-  const [picking, setPicking] = useState<string | null>(null);
-  const due = useMemo(() => {
-    const stats = productStats(view);
-    const onList = new Set(rows(view.trip_items).filter((i) => i.trip_id === trip.id && i.qty > 0).map((i) => i.product_id));
-    return [...stats.entries()]
-      // Skip things you've stopped buying: more than three cycles overdue.
-      .filter(([pid, s]) => s.due && s.count >= 2 && s.daysSince! <= s.cycle! * 3 && !onList.has(pid) && view.products[pid]?.active)
-      .sort((a, b) => (b[1].daysSince! / b[1].cycle!) - (a[1].daysSince! / a[1].cycle!))
-      .slice(0, 8)
-      .map(([pid, s]) => ({ product: view.products[pid], s }));
-  }, [view, trip.id]);
-  if (!due.length) return null;
-  const add = (pid: string, sectionId: string) => {
-    store.commit(addToTrip(store.getSnapshot().view, trip, sectionId, pid, 1));
-    notify(`Added ${view.products[pid].name} to ${view.sections[sectionId]?.name}`);
-  };
-  return (
-    <div className="due-row">
-      <span className="eyebrow" style={{ marginRight: 4 }}>Usually bought by now</span>
-      {due.map(({ product, s }) => (
-        <button
-          key={product.id} type="button" className="chip chip-btn"
-          title={`Last bought ${s.daysSince} days ago; usually every ${Math.round(s.cycle!)} days`}
-          onClick={() => {
-            const sec = bestSectionFor(view, product.id);
-            if (sec && view.sections[sec]) add(product.id, sec);
-            else setPicking(product.id);
-          }}
-        >
-          <Plus12 /> {product.name}
-        </button>
-      ))}
-      {picking && (
-        <Sheet title={`Add ${view.products[picking].name}`} sub="Which part of the list?" onClose={() => setPicking(null)}>
-          <div className="stack" style={{ gap: 10 }}>
-            {sortedSections(view).map((sec) => (
-              <button key={sec.id} type="button" className="btn big block" onClick={() => { add(picking, sec.id); setPicking(null); }}>{sec.name}</button>
-            ))}
-          </div>
-        </Sheet>
-      )}
-    </div>
-  );
-}
-
-const Plus12 = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden>
-    <path d="M12 5v14M5 12h14" />
-  </svg>
-);

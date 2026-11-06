@@ -37,23 +37,54 @@ function db_formatColumns_(sheet, table) {
   });
 }
 
+/** The header row as written in the sheet (column names). */
+function db_header_(sheet) {
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return [];
+  return sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) { return String(h).trim(); });
+}
+
+/**
+ * Reads rows by column NAME, not position, so a tab written with an older set of
+ * columns still reads correctly after a field is added to CORE_SCHEMA.
+ */
 function db_readTable_(ss, table) {
   var sheet = db_sheet_(ss, table);
   var last = sheet.getLastRow();
   var out = {};
   if (last < 2) return out;
-  var cols = coreColumns(table).length;
-  var values = sheet.getRange(2, 1, last - 1, cols).getValues();
+  var header = db_header_(sheet);
+  if (!header.length) return out;
+  var values = sheet.getRange(2, 1, last - 1, header.length).getValues();
   values.forEach(function (arr) {
-    if (!arr[0]) return;
-    var row = coreRowFromArray(table, arr);
+    var partial = {};
+    header.forEach(function (h, i) { if (h) partial[h] = arr[i]; });
+    if (!partial.id) return;
+    var row = coreNormalizeRow(table, partial);
     out[row.id] = row;
   });
   return out;
 }
 
+/** Brings the header row (and column formats) up to date with CORE_SCHEMA before a full rewrite. */
+function db_ensureHeader_(sheet, table) {
+  var cols = coreColumns(table);
+  var header = db_header_(sheet);
+  if (header.join('\u0001') === cols.join('\u0001')) return;
+  if (sheet.getMaxColumns() < cols.length) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), cols.length - sheet.getMaxColumns());
+  }
+  if (header.length > cols.length) {
+    sheet.getRange(1, cols.length + 1, sheet.getMaxRows(), header.length - cols.length).clearContent();
+  }
+  sheet.getRange(1, 1, 1, cols.length).setValues([cols]).setFontWeight('bold');
+  db_formatColumns_(sheet, table);
+}
+
+/** Rewrites every row of the table in CORE_SCHEMA column order. */
 function db_writeTable_(ss, table, rowsById) {
   var sheet = db_sheet_(ss, table);
+  db_ensureHeader_(sheet, table);
   var cols = coreColumns(table).length;
   var ids = Object.keys(rowsById);
   var existingRows = Math.max(sheet.getLastRow() - 1, 0);

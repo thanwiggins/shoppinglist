@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createProduct, updateProduct } from '../data/actions';
-import { money, searchProducts, sortedDepartments } from '../data/selectors';
+import { parsePrice, savedPrice } from '../data/pricing';
+import { money, searchProducts, settingNumber, sortedDepartments } from '../data/selectors';
 import type { Product, Tables } from '../data/types';
 import { store, useStore } from '../data/useStore';
 import { Close, Plus } from './icons';
@@ -14,7 +15,10 @@ export function Sheet({ title, sub, onClose, children, wide }: {
   const titleId = useId();
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
-    const first = ref.current?.querySelector<HTMLElement>('input, select, textarea, button:not(.icon-btn)');
+    // A field marked data-autofocus wins; otherwise the first control. (React's autoFocus can
+    // lose to the previous sheet handing focus back, so the sheet decides here.)
+    const first = ref.current?.querySelector<HTMLElement>('[data-autofocus]')
+      ?? ref.current?.querySelector<HTMLElement>('input, select, textarea, button:not(.icon-btn)');
     first?.focus();
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKey);
@@ -162,27 +166,79 @@ export function ProductPicker({ placeholder, onPick, exclude }: {
 
 /* ---------------- Add / edit a product ---------------- */
 
-export function ProductSheet({ product, initialName = '', onClose, onSaved, title }: {
+/**
+ * A shelf-price input with a live preview of the price Aisle will save
+ * (tax added, rounded to 50¢ — see data/pricing.ts). Blank means "leave the price as it is"
+ * when `current` is given.
+ */
+export function ShelfPriceField({ id, value, onChange, current, big, autoFocus }: {
+  id: string; value: string; onChange: (v: string) => void; current?: number; big?: boolean; autoFocus?: boolean;
+}) {
+  const { view } = useStore();
+  const tax = settingNumber(view, 'tax_rate') ?? 0;
+  const shelf = parsePrice(value);
+  const saved = savedPrice(shelf, tax);
+  const typed = value.trim() !== '';
+  const hintId = `${id}-hint`;
+  return (
+    <div className="field">
+      <label htmlFor={id}>Shelf price</label>
+      <div className="input-money">
+        <span>$</span>
+        <input
+          id={id} className={`input num${big ? ' big' : ''}`} inputMode="decimal" autoComplete="off" value={value}
+          onChange={(e) => onChange(e.target.value)} placeholder={current !== undefined ? 'Leave blank to keep' : '0.00'}
+          aria-describedby={hintId} data-autofocus={autoFocus ? '' : undefined}
+        />
+      </div>
+      <div id={hintId} className="price-preview" aria-live="polite">
+        {typed && isFinite(shelf) ? (
+          <>Saves as <strong className="num">{money(saved)}</strong>{' '}
+            <span className="muted">({money(shelf)}{tax ? ` + ${tax}% tax` : ''}, rounded to 50¢)</span></>
+        ) : typed ? (
+          <span className="form-error">Enter a price like 3.29</span>
+        ) : current !== undefined ? (
+          <span className="muted">Saved price now <span className="num">{money(current)}</span></span>
+        ) : (
+          <span className="muted">{tax ? `Adds ${tax}% tax and rounds to 50¢.` : 'Rounds to 50¢. Set your sales tax in Settings.'}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Reads a ShelfPriceField's text: undefined = left blank, NaN = not a price, else the saved price. */
+export function shelfToSaved(text: string, view: Tables): number | undefined {
+  if (!text.trim()) return undefined;
+  const shelf = parsePrice(text);
+  if (!isFinite(shelf)) return NaN;
+  return savedPrice(shelf, settingNumber(view, 'tax_rate') ?? 0);
+}
+
+export function ProductSheet({ product, initialName = '', onClose, onSaved, title, focusPrice }: {
   product?: Product;
   initialName?: string;
   onClose: () => void;
   onSaved?: (id: string) => void;
   title?: string;
+  focusPrice?: boolean;
 }) {
   const { view } = useStore();
   const [name, setName] = useState(product?.name ?? initialName);
-  const [price, setPrice] = useState(product ? product.price.toFixed(2) : '');
+  const [shelf, setShelf] = useState('');
   const [dept, setDept] = useState(product?.dept_id ?? '');
   const [error, setError] = useState('');
   const save = () => {
-    const p = parseFloat(price.replace('$', ''));
+    const price = shelfToSaved(shelf, view);
+    if (price !== undefined && !isFinite(price)) return setError('Enter a shelf price like 3.29.');
+    if (!product && price === undefined) return setError('Enter the shelf price.');
     if (!dept) return setError('Choose a department.');
     try {
       if (product) {
-        store.commit(updateProduct(view, product.id, { name, price: p, dept_id: dept }));
+        store.commit(updateProduct(view, product.id, { name, dept_id: dept, ...(price !== undefined ? { price } : {}) }));
         onSaved?.(product.id);
       } else {
-        const { ops, id } = createProduct(view, { name, price: p, dept_id: dept });
+        const { ops, id } = createProduct(view, { name, price: price!, dept_id: dept });
         store.commit(ops);
         onSaved?.(id);
       }
@@ -198,13 +254,7 @@ export function ProductSheet({ product, initialName = '', onClose, onSaved, titl
           <label htmlFor="ps-name">Name</label>
           <input id="ps-name" className="input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
         </div>
-        <div className="field">
-          <label htmlFor="ps-price">Price</label>
-          <div className="input-money">
-            <span>$</span>
-            <input id="ps-price" className="input num" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" />
-          </div>
-        </div>
+        <ShelfPriceField id="ps-price" value={shelf} onChange={setShelf} current={product?.price} autoFocus={focusPrice} />
         <div className="field">
           <label htmlFor="ps-dept">Department</label>
           <DeptSelect id="ps-dept" value={dept} onChange={setDept} view={view} placeholder />

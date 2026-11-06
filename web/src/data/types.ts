@@ -20,6 +20,8 @@ export type ItemStatus = 'todo' | 'in_cart' | 'skipped';
 export interface TripItem extends SystemFields {
   trip_id: string; product_id: string; section_id: string; qty: number;
   source: ItemSource; status: ItemStatus; price: number;
+  /** Order within its group on the Plan screen (staples use Staple.sort). */
+  sort: number;
 }
 export interface TripMeal extends SystemFields { trip_id: string; meal_id: string }
 export interface Purchase extends SystemFields { product_id: string; date: string; qty: number; price: number; trip_id: string }
@@ -62,7 +64,7 @@ export const DEFAULTS: { [T in TableName]: Omit<RowTypes[T], 'id'> } = {
   meals: { name: '', note: '', active: true },
   meal_items: { meal_id: '', product_id: '', qty: 1, pantry: false },
   trips: { status: 'planning', created: '', date: '', est_total: 0, actual_total: 0 },
-  trip_items: { trip_id: '', product_id: '', section_id: '', qty: 0, source: 'added', status: 'todo', price: 0 },
+  trip_items: { trip_id: '', product_id: '', section_id: '', qty: 0, source: 'added', status: 'todo', price: 0, sort: 0 },
   trip_meals: { trip_id: '', meal_id: '' },
   purchases: { product_id: '', date: '', qty: 1, price: 0, trip_id: '' },
   settings: { value: '' }
