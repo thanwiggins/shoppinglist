@@ -242,17 +242,38 @@ function checkProductName(t: Tables, name: string, exceptId?: string) {
   if (clash) throw new ActionError(`“${clash.name}” is already in your products.`);
 }
 
-export function createProduct(t: Tables, input: { name: string; price: number; dept_id: string }): { ops: Op[]; id: string } {
+/**
+ * Tidies a photo / product-page link: blank stays blank, "www.store.com/x" gets https://,
+ * anything that isn't a web address is refused.
+ */
+export function cleanLink(text: string): string {
+  const raw = text.trim();
+  if (!raw) return '';
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`;
+  let url: URL;
+  try {
+    url = new URL(withScheme);
+  } catch {
+    throw new ActionError('That link doesn’t look like a web address.');
+  }
+  if ((url.protocol !== 'https:' && url.protocol !== 'http:') || !url.hostname.includes('.')) {
+    throw new ActionError('That link doesn’t look like a web address.');
+  }
+  return url.href;
+}
+
+export function createProduct(t: Tables, input: { name: string; price: number; dept_id: string; link?: string }): { ops: Op[]; id: string } {
   const name = input.name.trim();
   checkProductName(t, name);
   if (!(input.price >= 0)) throw new ActionError('Enter a price.');
+  const link = cleanLink(input.link ?? '');
   // Bring back an archived product with the same name instead of making a twin.
   const archived = rows(t.products).find((p) => !p.active && p.name.toLowerCase() === name.toLowerCase());
   const id = archived?.id ?? newId('p');
-  return { id, ops: [upsert('products', id, { name, price: round2(input.price), dept_id: input.dept_id, active: true })] };
+  return { id, ops: [upsert('products', id, { name, price: round2(input.price), dept_id: input.dept_id, link, active: true })] };
 }
 
-export function updateProduct(t: Tables, productId: string, fields: Partial<Pick<Product, 'name' | 'price' | 'dept_id' | 'note' | 'active'>>): Op[] {
+export function updateProduct(t: Tables, productId: string, fields: Partial<Pick<Product, 'name' | 'price' | 'dept_id' | 'note' | 'active' | 'link'>>): Op[] {
   const clean: Partial<Product> = { ...fields };
   if (clean.name !== undefined) {
     clean.name = clean.name.trim();
@@ -262,6 +283,7 @@ export function updateProduct(t: Tables, productId: string, fields: Partial<Pick
     if (!(clean.price >= 0)) throw new ActionError('Enter a price.');
     clean.price = round2(clean.price);
   }
+  if (clean.link !== undefined) clean.link = cleanLink(clean.link);
   return [upsert('products', productId, clean)];
 }
 

@@ -8,7 +8,11 @@ export interface SystemFields {
 }
 
 export interface Department extends SystemFields { name: string; walk_order: number }
-export interface Product extends SystemFields { name: string; price: number; dept_id: string; note: string; active: boolean }
+export interface Product extends SystemFields {
+  name: string; price: number; dept_id: string; note: string; active: boolean;
+  /** Optional photo or product-page URL, shown in the store to identify the item. */
+  link: string;
+}
 export interface Section extends SystemFields { name: string; sort: number }
 export interface Staple extends SystemFields { section_id: string; product_id: string; default_qty: number; sort: number }
 export interface Meal extends SystemFields { name: string; note: string; active: boolean }
@@ -58,7 +62,7 @@ export type Op =
 /** Defaults for a brand-new row, matching CORE_SCHEMA. */
 export const DEFAULTS: { [T in TableName]: Omit<RowTypes[T], 'id'> } = {
   departments: { name: '', walk_order: 0 },
-  products: { name: '', price: 0, dept_id: '', note: '', active: true },
+  products: { name: '', price: 0, dept_id: '', note: '', active: true, link: '' },
   sections: { name: '', sort: 0 },
   staples: { section_id: '', product_id: '', default_qty: 0, sort: 0 },
   meals: { name: '', note: '', active: true },

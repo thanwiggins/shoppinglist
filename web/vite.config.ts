@@ -30,7 +30,20 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        navigateFallback: 'index.html'
+        navigateFallback: 'index.html',
+        // Product photos (links to other sites) are kept on the device after the first load,
+        // so they still show in aisles with no signal.
+        runtimeCaching: [
+          {
+            urlPattern: ({ request, sameOrigin }) => request.destination === 'image' && !sameOrigin,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'product-photos',
+              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 120, purgeOnQuotaError: true },
+              cacheableResponse: { statuses: [0, 200] }
+            }
+          }
+        ]
       }
     })
   ],

@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { addToTrip, finishTrip, setShopStatus, startShopping, updateProduct, type Leftovers } from '../data/actions';
 import { currentTrip, money, plural, shopModel, sortedDepartments, sortedSections, todayIso, type ShopRow } from '../data/selectors';
 import type { Trip } from '../data/types';
 import { store, useStore } from '../data/useStore';
-import { DeptSelect, ProductPicker, Sheet, ShelfPriceField, shelfToSaved } from '../ui/common';
+import { DeptSelect, ProductLinkButton, ProductPhotoSheet, ProductPicker, Sheet, ShelfPriceField, safeLink, shelfToSaved } from '../ui/common';
 import { Check } from '../ui/icons';
 import { notify } from '../ui/toast';
 
@@ -17,7 +17,19 @@ export function ShopPage() {
   const [editing, setEditing] = useState<ShopRow | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [adding, setAdding] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<string | null>(null);
   const depts = sortedDepartments(view);
+
+  // Load every photo on this week's list now, while there's signal, so they're saved on the
+  // device (see the image cache in vite.config.ts) for aisles with no reception.
+  const links = model.groups.flatMap((g) => g.rows).map((r) => safeLink(r.product.link)).filter(Boolean).join('\n');
+  useEffect(() => {
+    for (const href of links ? links.split('\n') : []) {
+      const img = new Image();
+      img.referrerPolicy = 'no-referrer';
+      img.src = href;
+    }
+  }, [links]);
   const keyOf = new Map(depts.map((d, i) => [d.id, i + 1]));
 
   if (!trip) return <div className="empty">Getting this week ready…</div>;
@@ -86,6 +98,7 @@ export function ShopPage() {
                     {r.status === 'skipped' && <span className="pill warn">Out of stock</span>}
                     {r.qty > 1 && r.status !== 'skipped' && <span className="qty-badge">×{r.qty}</span>}
                   </button>
+                  <ProductLinkButton product={r.product} onOpen={() => setPhoto(r.productId)} />
                   <button type="button" className="shop-price" aria-label={`Edit price or department for ${r.product.name}`} onClick={() => setEditing(r)}>
                     <span>{money(r.total)}</span>
                   </button>
@@ -106,6 +119,7 @@ export function ShopPage() {
 
       {editing && <EditSheet row={editing} trip={trip} onClose={() => setEditing(null)} />}
       {finishing && <FinishSheet trip={trip} onClose={() => setFinishing(false)} />}
+      {photo && view.products[photo] && <ProductPhotoSheet product={view.products[photo]} onClose={() => setPhoto(null)} />}
       {adding && (
         <Sheet title={`Add ${view.products[adding]?.name}`} sub="Which part of the list?" onClose={() => setAdding(null)}>
           <div className="stack" style={{ gap: 10 }}>

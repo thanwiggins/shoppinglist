@@ -17,6 +17,7 @@ var CORE_SCHEMA = {
     price: { type: 'number', def: 0 },
     dept_id: { type: 'string', def: '' },
     note: { type: 'string', def: '' },
+    link: { type: 'string', def: '' },
     active: { type: 'bool', def: true }
   },
   sections: {

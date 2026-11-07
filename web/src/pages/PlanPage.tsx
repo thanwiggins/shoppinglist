@@ -6,7 +6,7 @@ import {
 } from '../data/selectors';
 import type { Tables, Trip } from '../data/types';
 import { store, useStore } from '../data/useStore';
-import { ProductPicker, ProductSheet, SECTION_COLORS, Sheet, Stepper } from '../ui/common';
+import { ProductPhotoSheet, ProductPicker, ProductSheet, SECTION_COLORS, Sheet, Stepper, Thumb, safeLink } from '../ui/common';
 import { Arrow, Grip, Pin } from '../ui/icons';
 import { Sortable, type GripProps } from '../ui/Sortable';
 import { notify } from '../ui/toast';
@@ -153,6 +153,8 @@ function SectionCard({ s, trip, color, view }: { s: PlanSection; trip: Trip; col
 function PlanRow({ it, trip, view, grip }: { it: PlanItem; trip: Trip; view: Tables; grip: GripProps }) {
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [photo, setPhoto] = useState(false);
+  const link = safeLink(it.product.link);
   const pinned = !!it.staple;
   const name = it.product.name;
   const togglePin = () => {
@@ -180,7 +182,14 @@ function PlanRow({ it, trip, view, grip }: { it: PlanItem; trip: Trip; view: Tab
       {menu && (
         <Sheet title={name} sub={`${money(it.product.price)} · ${view.departments[it.product.dept_id]?.name ?? 'No department'}`} onClose={() => setMenu(false)}>
           <div className="stack" style={{ gap: 10 }}>
-            <button type="button" className="btn big block" onClick={() => { setMenu(false); setEditing(true); }}>Edit price, name or department</button>
+            {link && (
+              <button type="button" className="btn big block thumb-row" onClick={() => { setMenu(false); setPhoto(true); }}>
+                <Thumb href={link} size={34} /> See what it looks like
+              </button>
+            )}
+            <button type="button" className="btn big block" onClick={() => { setMenu(false); setEditing(true); }}>
+              {link ? 'Edit price, name, department or link' : 'Edit price, name, department or add a photo'}
+            </button>
             <button type="button" className="btn big block" onClick={() => { togglePin(); setMenu(false); }}>
               {pinned ? 'Unpin: stop showing every week' : 'Pin as a weekly staple'}
             </button>
@@ -193,6 +202,7 @@ function PlanRow({ it, trip, view, grip }: { it: PlanItem; trip: Trip; view: Tab
         </Sheet>
       )}
       {editing && <ProductSheet product={it.product} focusPrice onClose={() => setEditing(false)} />}
+      {photo && <ProductPhotoSheet product={it.product} onClose={() => setPhoto(false)} />}
     </div>
   );
 }

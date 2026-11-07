@@ -72,8 +72,8 @@ describe('Core sync', () => {
   });
 
   it('coerces sheet values back to their types', () => {
-    const row = core.coreRowFromArray('products', ['p_1', 'Milk', '3.50', 'd_1', '', 'TRUE', '2026-01-01', 'FALSE', '4']);
-    expect(row).toMatchObject({ price: 3.5, active: true, deleted: false, _v: 4 });
+    const row = core.coreRowFromArray('products', ['p_1', 'Milk', '3.50', 'd_1', '', 'https://example.com/milk.jpg', 'TRUE', '2026-01-01', 'FALSE', '4']);
+    expect(row).toMatchObject({ price: 3.5, link: 'https://example.com/milk.jpg', active: true, deleted: false, _v: 4 });
     expect(core.coreRowFromArray('purchases', ['pu_1', 'p_1', new Date(2026, 9, 29), 1, 2, '', '', false, 1]).date).toBe('2026-10-29');
   });
 

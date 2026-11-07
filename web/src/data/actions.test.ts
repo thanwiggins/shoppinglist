@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { mealId, productId, sampleView, sectionId } from '../test/helpers';
 import {
-  ActionError, createProduct, deleteDepartment, finishTrip, moveDepartment, pantryCheck, reorderStaples,
+  ActionError, cleanLink, createProduct, deleteDepartment, finishTrip, moveDepartment, pantryCheck, reorderStaples,
   reorderTripItems, setPantryNeeded, setQty, setShopStatus, toggleMeal, toggleStaple, updateProduct
 } from './actions';
 import { applyOps } from './ops';
@@ -196,6 +196,23 @@ describe('reset list options', () => {
     let { t, trip } = setup();
     t = applyOps(t, finishTrip(t, trip, '2026-11-07', 'drop'));
     expect(nextItems(t)).toHaveLength(0);
+  });
+});
+
+describe('product links', () => {
+  it('tidies links and refuses things that are not web addresses', () => {
+    expect(cleanLink('')).toBe('');
+    expect(cleanLink('  www.walmart.com/ip/123 ')).toBe('https://www.walmart.com/ip/123');
+    expect(cleanLink('https://i5.walmartimages.com/a.jpeg?w=200')).toBe('https://i5.walmartimages.com/a.jpeg?w=200');
+    expect(() => cleanLink('javascript:alert(1)')).toThrow(ActionError);
+    expect(() => cleanLink('milk')).toThrow(ActionError);
+  });
+
+  it('saves a link with a new product and on edit', () => {
+    const t = sampleView();
+    const { ops } = createProduct(t, { name: 'Oat Milk', price: 4, dept_id: '', link: 'example.com/oat.jpg' });
+    expect(ops[0]).toMatchObject({ fields: { link: 'https://example.com/oat.jpg' } });
+    expect(updateProduct(t, productId(t, 'Milk'), { link: '' })[0]).toMatchObject({ fields: { link: '' } });
   });
 });
 

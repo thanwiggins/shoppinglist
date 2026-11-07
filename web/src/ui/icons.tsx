@@ -42,6 +42,9 @@ export const MealIcon = ({ size = 22, className }: P) => (
 export const TagIcon = ({ size = 22, className }: P) => (
   <svg {...base(size)} className={className}><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z" /><circle cx="7.5" cy="7.5" r="1.5" /></svg>
 );
+export const LinkIcon = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></svg>
+);
 export const Grip = ({ size = 16, className }: P) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden className={className}>
     <circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" /><circle cx="9" cy="12" r="1.6" />

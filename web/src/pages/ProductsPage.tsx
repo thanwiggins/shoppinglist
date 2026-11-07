@@ -5,8 +5,8 @@ import {
 import { money, plural, productStats, rows, shortDate, sortedDepartments, type ProductStats } from '../data/selectors';
 import type { Product, Tables } from '../data/types';
 import { store, useStore } from '../data/useStore';
-import { DeptSelect, ProductSheet } from '../ui/common';
-import { Close, Down, Plus, Search, Up } from '../ui/icons';
+import { DeptSelect, ProductLinkButton, ProductPhotoSheet, ProductSheet } from '../ui/common';
+import { Close, Down, Pencil, Plus, Search, Up } from '../ui/icons';
 import { notify } from '../ui/toast';
 
 const PAGE = 120;
@@ -73,7 +73,7 @@ function ProductList() {
               <th scope="col" style={{ width: 200 }}>Department</th>
               <th scope="col" style={{ width: 100, textAlign: 'right' }}>Price</th>
               <th scope="col" style={{ width: 190 }}>History</th>
-              <th scope="col" style={{ width: 48 }}><span className="sr-only">Actions</span></th>
+              <th scope="col" style={{ width: 84 }}><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -95,6 +95,8 @@ function ProductList() {
 function ProductRow({ p, view, s }: { p: Product; view: Tables; s?: ProductStats }) {
   const [name, setName] = useState(p.name);
   const [pricing, setPricing] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [photo, setPhoto] = useState(false);
   useEffect(() => setName(p.name), [p.name]);
   const save = (fields: Partial<Product>) => {
     try {
@@ -111,12 +113,16 @@ function ProductRow({ p, view, s }: { p: Product; view: Tables; s?: ProductStats
   return (
     <tr>
       <td className="c-name">
-        <input
-          className="cell-input" value={name} aria-label="Product name"
-          onChange={(e) => setName(e.target.value)}
-          onBlur={() => name.trim() !== p.name && save({ name })}
-          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-        />
+        <div className="row-flex" style={{ gap: 6 }}>
+          <input
+            className="cell-input" value={name} aria-label="Product name"
+            onChange={(e) => setName(e.target.value)}
+            onBlur={() => name.trim() !== p.name && save({ name })}
+            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+          />
+          <ProductLinkButton product={p} size={32} onOpen={() => setPhoto(true)} />
+        </div>
+        {photo && <ProductPhotoSheet product={p} onClose={() => setPhoto(false)} />}
       </td>
       <td className="c-dept">
         <DeptSelect className="cell-input" value={p.dept_id} view={view} label={`Department for ${p.name}`} onChange={(v) => save({ dept_id: v })} />
@@ -125,7 +131,7 @@ function ProductRow({ p, view, s }: { p: Product; view: Tables; s?: ProductStats
         <button type="button" className="cell-input price" aria-label={`Price of ${p.name}: ${money(p.price)}. Change it`} onClick={() => setPricing(true)}>
           {money(p.price)}
         </button>
-        {pricing && <ProductSheet product={p} title={`Price of ${p.name}`} focusPrice onClose={() => setPricing(false)} />}
+        {pricing && <ProductSheet product={p} title={`Edit ${p.name}`} focusPrice onClose={() => setPricing(false)} />}
       </td>
       <td className="c-hist">
         {s?.last ? (
@@ -136,7 +142,11 @@ function ProductRow({ p, view, s }: { p: Product; view: Tables; s?: ProductStats
         ) : <span className="muted" style={{ fontSize: 13 }}>Not bought yet</span>}
       </td>
       <td className="c-act">
-        <button type="button" className="icon-btn" aria-label={`Remove ${p.name}`} title="Remove product" onClick={archive}><Close size={16} /></button>
+        <div className="row-flex" style={{ gap: 2, justifyContent: 'flex-end' }}>
+          <button type="button" className="icon-btn" aria-label={`Edit ${p.name} (price, department, photo link)`} title="Edit, or add a photo link" onClick={() => setEditing(true)}><Pencil size={16} /></button>
+          <button type="button" className="icon-btn" aria-label={`Remove ${p.name}`} title="Remove product" onClick={archive}><Close size={16} /></button>
+        </div>
+        {editing && <ProductSheet product={p} title={`Edit ${p.name}`} onClose={() => setEditing(false)} />}
       </td>
     </tr>
   );

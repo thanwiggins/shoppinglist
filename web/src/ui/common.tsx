@@ -1,10 +1,10 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
-import { createProduct, updateProduct } from '../data/actions';
+import { cleanLink, createProduct, updateProduct } from '../data/actions';
 import { parsePrice, savedPrice } from '../data/pricing';
 import { money, searchProducts, settingNumber, sortedDepartments } from '../data/selectors';
 import type { Product, Tables } from '../data/types';
 import { store, useStore } from '../data/useStore';
-import { Close, Plus } from './icons';
+import { Close, LinkIcon, Plus } from './icons';
 
 /* ---------------- Sheet: bottom sheet on phones, dialog on larger screens ---------------- */
 
@@ -227,6 +227,7 @@ export function ProductSheet({ product, initialName = '', onClose, onSaved, titl
   const [name, setName] = useState(product?.name ?? initialName);
   const [shelf, setShelf] = useState('');
   const [dept, setDept] = useState(product?.dept_id ?? '');
+  const [link, setLink] = useState(product?.link ?? '');
   const [error, setError] = useState('');
   const save = () => {
     const price = shelfToSaved(shelf, view);
@@ -235,10 +236,10 @@ export function ProductSheet({ product, initialName = '', onClose, onSaved, titl
     if (!dept) return setError('Choose a department.');
     try {
       if (product) {
-        store.commit(updateProduct(view, product.id, { name, dept_id: dept, ...(price !== undefined ? { price } : {}) }));
+        store.commit(updateProduct(view, product.id, { name, dept_id: dept, link, ...(price !== undefined ? { price } : {}) }));
         onSaved?.(product.id);
       } else {
-        const { ops, id } = createProduct(view, { name, price: price!, dept_id: dept });
+        const { ops, id } = createProduct(view, { name, price: price!, dept_id: dept, link });
         store.commit(ops);
         onSaved?.(id);
       }
@@ -259,12 +260,103 @@ export function ProductSheet({ product, initialName = '', onClose, onSaved, titl
           <label htmlFor="ps-dept">Department</label>
           <DeptSelect id="ps-dept" value={dept} onChange={setDept} view={view} placeholder />
         </div>
+        <LinkField value={link} onChange={setLink} />
         {error && <div className="form-error" role="alert">{error}</div>}
         <div className="sheet-actions">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
           <button type="submit" className="btn primary">{product ? 'Save' : 'Add product'}</button>
         </div>
       </form>
+    </Sheet>
+  );
+}
+
+/** Photo or product-page link, with a small preview when it's a picture. */
+function LinkField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const href = safeLink(value);
+  return (
+    <div className="field">
+      <label htmlFor="ps-link">Photo or product page link <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
+      <div className="row-flex">
+        <input
+          id="ps-link" className="input" type="text" inputMode="url" autoComplete="off" spellCheck={false}
+          value={value} onChange={(e) => onChange(e.target.value)} placeholder="https://…" aria-describedby="ps-link-hint"
+        />
+        {href && <Thumb href={href} size={44} />}
+        {value && (
+          <button type="button" className="icon-btn" aria-label="Remove the link" onClick={() => onChange('')}><Close size={16} /></button>
+        )}
+      </div>
+      <div id="ps-link-hint" className="muted" style={{ fontSize: 12 }}>
+        Helps you spot it in the store. A picture link shows right in the app; on a store’s website,
+        right-click the product photo and choose “Copy image address”. A page link opens in a new tab.
+      </div>
+    </div>
+  );
+}
+
+/** The link if it's a usable http(s) address, else ''. Never returns javascript: or other schemes. */
+export function safeLink(text: string): string {
+  try {
+    return cleanLink(text);
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * A small square showing the product's photo. If the link isn't a picture (or can't load),
+ * it shows a link icon instead. Purely visual: wrap it in a button to make it tappable.
+ */
+export function Thumb({ href, size = 40 }: { href: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [href]);
+  return (
+    <span className="thumb" style={{ width: size, height: size }} aria-hidden>
+      {failed
+        ? <LinkIcon size={Math.round(size * 0.45)} />
+        : <img src={href} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />}
+    </span>
+  );
+}
+
+/** Tappable thumbnail that opens the product's photo / link. */
+export function ProductLinkButton({ product, size = 40, onOpen }: { product: Product; size?: number; onOpen: () => void }) {
+  const href = safeLink(product.link);
+  if (!href) return null;
+  return (
+    <button type="button" className="thumb-btn" onClick={onOpen} aria-label={`See a photo or link for ${product.name}`} title="See what it looks like">
+      <Thumb href={href} size={size} />
+    </button>
+  );
+}
+
+/** Full-size photo (or the link, if it's a web page) for spotting a product in the store. */
+export function ProductPhotoSheet({ product, onClose }: { product: Product; onClose: () => void }) {
+  const { view } = useStore();
+  const href = safeLink(product.link);
+  const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading');
+  const host = href ? new URL(href).hostname.replace(/^www\./, '') : '';
+  const dept = view.departments[product.dept_id]?.name;
+  return (
+    <Sheet title={product.name} sub={`${money(product.price)}${dept ? ` · ${dept}` : ''}`} onClose={onClose}>
+      {href && state !== 'error' && (
+        <div className="photo-frame">
+          <img src={href} alt={`Photo of ${product.name}`} referrerPolicy="no-referrer" onLoad={() => setState('ok')} onError={() => setState('error')} />
+        </div>
+      )}
+      {state === 'error' && (
+        <p className="muted" style={{ margin: 0 }}>
+          {navigator.onLine === false
+            ? 'You’re offline, and this picture hasn’t been saved on this device yet.'
+            : `This link goes to a web page on ${host}, not straight to a picture.`}
+        </p>
+      )}
+      {href && (
+        <a className="btn big block" href={href} target="_blank" rel="noopener noreferrer">
+          {state === 'ok' ? 'Open full size' : `Open ${host}`}
+        </a>
+      )}
     </Sheet>
   );
 }
